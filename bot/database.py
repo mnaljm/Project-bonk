@@ -99,6 +99,11 @@ class Database:
                 caps_filter INTEGER DEFAULT 1,
                 caps_threshold INTEGER DEFAULT 70,
                 spam_threshold INTEGER DEFAULT 5,
+                lockdown_mode INTEGER DEFAULT 0,
+                lockdown_auto_enable INTEGER DEFAULT 1,
+                lockdown_caps_threshold INTEGER DEFAULT 50,
+                lockdown_spam_threshold INTEGER DEFAULT 3,
+                lockdown_timeout_duration INTEGER DEFAULT 300,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (guild_id) REFERENCES guild_config(guild_id)
@@ -122,6 +127,70 @@ class Database:
         """)
         
         await self.connection.commit()
+
+    async def migrate_database(self):
+        """Migrate database schema to add new columns"""
+        try:
+            # Check if lockdown columns exist
+            cursor = await self.connection.execute("PRAGMA table_info(automod_settings)")
+            columns = await cursor.fetchall()
+            column_names = [column[1] for column in columns]
+            
+            # Add missing lockdown columns
+            if "lockdown_mode" not in column_names:
+                await self.connection.execute(
+                    "ALTER TABLE automod_settings ADD COLUMN lockdown_mode INTEGER DEFAULT 0"
+                )
+                self.logger.info("Added lockdown_mode column to automod_settings")
+            
+            if "lockdown_auto_enable" not in column_names:
+                await self.connection.execute(
+                    "ALTER TABLE automod_settings ADD COLUMN lockdown_auto_enable INTEGER DEFAULT 1"
+                )
+                self.logger.info("Added lockdown_auto_enable column to automod_settings")
+            
+            if "lockdown_caps_threshold" not in column_names:
+                await self.connection.execute(
+                    "ALTER TABLE automod_settings ADD COLUMN lockdown_caps_threshold INTEGER DEFAULT 50"
+                )
+                self.logger.info("Added lockdown_caps_threshold column to automod_settings")
+            
+            if "lockdown_spam_threshold" not in column_names:
+                await self.connection.execute(
+                    "ALTER TABLE automod_settings ADD COLUMN lockdown_spam_threshold INTEGER DEFAULT 3"
+                )
+                self.logger.info("Added lockdown_spam_threshold column to automod_settings")
+            
+            if "lockdown_timeout_duration" not in column_names:
+                await self.connection.execute(
+                    "ALTER TABLE automod_settings ADD COLUMN lockdown_timeout_duration INTEGER DEFAULT 300"
+                )
+                self.logger.info("Added lockdown_timeout_duration column to automod_settings")
+            
+            if "lockdown_manual_override" not in column_names:
+                await self.connection.execute(
+                    "ALTER TABLE automod_settings ADD COLUMN lockdown_manual_override INTEGER DEFAULT 0"
+                )
+                self.logger.info("Added lockdown_manual_override column to automod_settings")
+            
+            await self.connection.commit()
+            self.logger.info("Database migration completed successfully")
+            
+        except Exception as e:
+            self.logger.error(f"Database migration failed: {e}")
+
+    async def initialize(self):
+        """Initialize the database and create tables"""
+        # Ensure data directory exists
+        self.db_path.parent.mkdir(exist_ok=True)
+        
+        self.connection = await aiosqlite.connect(self.db_path)
+        await self.connection.execute("PRAGMA foreign_keys = ON")
+        # Enable row factory for dictionary-like access
+        self.connection.row_factory = aiosqlite.Row
+        await self.create_tables()
+        await self.migrate_database()  # Add migration after table creation
+        self.logger.info("Database initialized successfully")
 
     # Guild configuration methods
     async def get_guild_config(self, guild_id: int) -> dict:
@@ -332,6 +401,38 @@ class Database:
         )
         await self.connection.commit()
         return True
+
+    async def is_lockdown_active(self, guild_id: int) -> bool:
+        """Check if lockdown mode is active for a guild"""
+        automod_settings = await self.get_automod_settings(guild_id)
+        return bool(automod_settings.get("lockdown_mode", 0))
+
+    async def enable_lockdown(self, guild_id: int, manual: bool = False) -> bool:
+        """Enable lockdown mode for a guild"""
+        if manual:
+            # Manual override - set both lockdown_mode and lockdown_manual_override
+            return await self.update_automod_settings(guild_id, lockdown_mode=1, lockdown_manual_override=1)
+        else:
+            # Auto-enable - only set lockdown_mode
+            return await self.update_automod_settings(guild_id, lockdown_mode=1)
+
+    async def disable_lockdown(self, guild_id: int, manual: bool = False) -> bool:
+        """Disable lockdown mode for a guild"""
+        if manual:
+            # Manual disable - set manual override to prevent auto-enable
+            return await self.update_automod_settings(guild_id, lockdown_mode=0, lockdown_manual_override=1)
+        else:
+            # Auto-disable - only disable lockdown_mode, keep manual override
+            return await self.update_automod_settings(guild_id, lockdown_mode=0)
+    
+    async def is_manual_lockdown_override(self, guild_id: int) -> bool:
+        """Check if lockdown has been manually overridden"""
+        automod_settings = await self.get_automod_settings(guild_id)
+        return bool(automod_settings.get("lockdown_manual_override", 0))
+    
+    async def clear_lockdown_override(self, guild_id: int) -> bool:
+        """Clear manual lockdown override"""
+        return await self.update_automod_settings(guild_id, lockdown_manual_override=0)
 
     async def close(self):
         """Close the database connection"""

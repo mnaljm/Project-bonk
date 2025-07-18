@@ -157,6 +157,8 @@ COMMAND_PREFIX=!
 ### Configuration Commands
 - `/config [setting] [value]` - Configure server settings
 - `/automod [feature] [enabled]` - Configure auto-moderation
+- `/lockdown [action] [reason]` - Manage lockdown mode
+- `/lockdownconfig [setting] [value]` - Configure lockdown settings
 - `/settings` - View all settings
 
 ## Database

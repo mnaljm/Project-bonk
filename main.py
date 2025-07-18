@@ -60,6 +60,7 @@ class BonkBot(commands.Bot):
             "bot.cogs.automod",
             "bot.cogs.logging",
             "bot.cogs.config",
+            "bot.cogs.lockdown",
         ]
         
         for extension in extensions:

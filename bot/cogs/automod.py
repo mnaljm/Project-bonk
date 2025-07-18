@@ -44,25 +44,30 @@ class AutoMod(commands.Cog):
         # Get auto-moderation settings
         automod_settings = await self.bot.database.get_automod_settings(message.guild.id)
         
-        # Check if user has manage_messages permission (bypass auto-mod)
-        if message.author.guild_permissions.manage_messages:
+        # Check if lockdown mode is active
+        is_lockdown = await self.bot.database.is_lockdown_active(message.guild.id)
+        
+        # Check if user has manage_messages permission (bypass auto-mod, but not lockdown)
+        if message.author.guild_permissions.manage_messages and not is_lockdown:
             return
         
         # Check various auto-moderation features
-        await self.check_spam(message, automod_settings)
-        await self.check_profanity(message, automod_settings)
-        await self.check_caps(message, automod_settings)
-        await self.check_links(message, automod_settings)
-        await self.check_invites(message, automod_settings)
+        await self.check_spam(message, automod_settings, is_lockdown)
+        await self.check_profanity(message, automod_settings, is_lockdown)
+        await self.check_caps(message, automod_settings, is_lockdown)
+        await self.check_links(message, automod_settings, is_lockdown)
+        await self.check_invites(message, automod_settings, is_lockdown)
     
-    async def check_spam(self, message, settings):
+    async def check_spam(self, message, settings, is_lockdown=False):
         """Check for spam messages"""
         if not settings.get("spam_detection"):
             return
         
         user_id = message.author.id
         now = datetime.now()
-        threshold = settings.get("spam_threshold", 5)
+        
+        # Use lockdown threshold if in lockdown mode
+        threshold = settings.get("lockdown_spam_threshold", 3) if is_lockdown else settings.get("spam_threshold", 5)
         
         # Add message to tracker
         self.spam_tracker[user_id].append(now)
@@ -75,15 +80,16 @@ class AutoMod(commands.Cog):
         
         # Check if spam threshold is exceeded
         if len(self.spam_tracker[user_id]) >= threshold:
-            await self.take_action(
-                message,
-                "spam",
-                f"Sending {len(self.spam_tracker[user_id])} messages in 10 seconds"
-            )
+            action_type = "spam_lockdown" if is_lockdown else "spam"
+            reason = f"Sending {len(self.spam_tracker[user_id])} messages in 10 seconds"
+            if is_lockdown:
+                reason += " (Lockdown mode)"
+            
+            await self.take_action(message, action_type, reason, is_lockdown)
             # Clear tracker for this user
             self.spam_tracker[user_id] = []
     
-    async def check_profanity(self, message, settings):
+    async def check_profanity(self, message, settings, is_lockdown=False):
         """Check for profanity in message"""
         if not settings.get("profanity_filter"):
             return
@@ -96,13 +102,14 @@ class AutoMod(commands.Cog):
                 found_words.append(word)
         
         if found_words:
-            await self.take_action(
-                message,
-                "profanity",
-                f"Message contains profanity: {', '.join(found_words)}"
-            )
+            action_type = "profanity_lockdown" if is_lockdown else "profanity"
+            reason = f"Message contains profanity: {', '.join(found_words)}"
+            if is_lockdown:
+                reason += " (Lockdown mode)"
+            
+            await self.take_action(message, action_type, reason, is_lockdown)
     
-    async def check_caps(self, message, settings):
+    async def check_caps(self, message, settings, is_lockdown=False):
         """Check for excessive caps"""
         if not settings.get("caps_filter"):
             return
@@ -113,50 +120,89 @@ class AutoMod(commands.Cog):
         
         caps_count = sum(1 for c in content if c.isupper())
         caps_percentage = (caps_count / len(content)) * 100
-        threshold = settings.get("caps_threshold", 70)
+        
+        # Use lockdown threshold if in lockdown mode
+        threshold = settings.get("lockdown_caps_threshold", 50) if is_lockdown else settings.get("caps_threshold", 70)
         
         if caps_percentage >= threshold:
-            await self.take_action(
-                message,
-                "excessive_caps",
-                f"Message is {caps_percentage:.1f}% caps (limit: {threshold}%)"
-            )
+            action_type = "excessive_caps_lockdown" if is_lockdown else "excessive_caps"
+            reason = f"Message is {caps_percentage:.1f}% caps (limit: {threshold}%)"
+            if is_lockdown:
+                reason += " (Lockdown mode)"
+            
+            await self.take_action(message, action_type, reason, is_lockdown)
     
-    async def check_links(self, message, settings):
+    async def check_links(self, message, settings, is_lockdown=False):
         """Check for links in message"""
         if not settings.get("link_filter"):
             return
         
         if self.link_pattern.search(message.content):
-            await self.take_action(
-                message,
-                "unauthorized_link",
-                "Message contains unauthorized links"
-            )
+            action_type = "unauthorized_link_lockdown" if is_lockdown else "unauthorized_link"
+            reason = "Message contains unauthorized links"
+            if is_lockdown:
+                reason += " (Lockdown mode)"
+            
+            await self.take_action(message, action_type, reason, is_lockdown)
     
-    async def check_invites(self, message, settings):
+    async def check_invites(self, message, settings, is_lockdown=False):
         """Check for Discord invites"""
         if not settings.get("invite_filter"):
             return
         
         if self.invite_pattern.search(message.content):
-            await self.take_action(
-                message,
-                "discord_invite",
-                "Message contains Discord invite links"
-            )
+            action_type = "discord_invite_lockdown" if is_lockdown else "discord_invite"
+            reason = "Message contains Discord invite links"
+            if is_lockdown:
+                reason += " (Lockdown mode)"
+            
+            await self.take_action(message, action_type, reason, is_lockdown)
     
-    async def take_action(self, message, violation_type, reason):
+    async def take_action(self, message, violation_type, reason, is_lockdown=False):
         """Take action against a message that violates auto-moderation rules"""
         try:
             # Delete the message
             await message.delete()
             
+            # In lockdown mode, apply timeout/mute
+            if is_lockdown:
+                automod_settings = await self.bot.database.get_automod_settings(message.guild.id)
+                timeout_duration = automod_settings.get("lockdown_timeout_duration", 300)  # 5 minutes default
+                
+                try:
+                    # Apply timeout
+                    timeout_until = datetime.now() + timedelta(seconds=timeout_duration)
+                    await message.author.timeout(timeout_until, reason=f"Auto-moderation lockdown: {reason}")
+                    
+                    # Create moderation case
+                    await self.bot.database.create_moderation_case(
+                        message.guild.id,
+                        "auto_timeout",
+                        message.author.id,
+                        self.bot.user.id,
+                        f"Auto-moderation lockdown: {reason}",
+                        timeout_duration
+                    )
+                    
+                except discord.HTTPException:
+                    pass  # Failed to timeout (permissions, etc.)
+            
             # Send warning to user
+            embed_title = f"Auto-Moderation - {violation_type.replace('_', ' ').title()}"
+            if is_lockdown:
+                embed_title += " (Lockdown Mode)"
+            
             embed = Utils.create_warning_embed(
                 f"Your message was deleted for: {reason}",
-                f"Auto-Moderation - {violation_type.replace('_', ' ').title()}"
+                embed_title
             )
+            
+            if is_lockdown:
+                embed.add_field(
+                    name="⚠️ Lockdown Mode Active",
+                    value="Stricter rules are currently in effect. You have been temporarily timed out.",
+                    inline=False
+                )
             
             try:
                 await message.author.send(embed=embed)
@@ -168,10 +214,14 @@ class AutoMod(commands.Cog):
             if log_channel_id:
                 log_channel = message.guild.get_channel(log_channel_id)
                 if log_channel:
+                    log_embed_title = "🤖 Auto-Moderation Action"
+                    if is_lockdown:
+                        log_embed_title = "🔒 Lockdown Auto-Moderation Action"
+                    
                     log_embed = Utils.create_embed(
-                        title="🤖 Auto-Moderation Action",
+                        title=log_embed_title,
                         description=f"Message deleted in {message.channel.mention}",
-                        color=discord.Color.orange(),
+                        color=discord.Color.red() if is_lockdown else discord.Color.orange(),
                         fields=[
                             {"name": "User", "value": f"{message.author.mention} ({message.author.id})", "inline": True},
                             {"name": "Channel", "value": message.channel.mention, "inline": True},
@@ -180,6 +230,13 @@ class AutoMod(commands.Cog):
                             {"name": "Original Message", "value": Utils.truncate_text(message.content, 1000), "inline": False},
                         ]
                     )
+                    
+                    if is_lockdown:
+                        log_embed.add_field(
+                            name="Action Taken",
+                            value="User has been timed out due to lockdown mode",
+                            inline=False
+                        )
                     
                     await log_channel.send(embed=log_embed)
             

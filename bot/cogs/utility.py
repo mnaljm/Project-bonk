@@ -307,6 +307,8 @@ class Utility(commands.Cog):
         config_commands = [
             "`/config` - Configure server settings",
             "`/automod` - Configure auto-moderation",
+            "`/lockdown` - Manage lockdown mode",
+            "`/lockdownconfig` - Configure lockdown settings",
         ]
         
         embed.add_field(

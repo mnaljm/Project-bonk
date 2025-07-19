@@ -139,6 +139,23 @@ class BonkBot(commands.Bot):
             await asyncio.sleep(60)  # Check every minute
 
     async def cleanup_old_activity_data(self):
+        """Periodically clean up old activity data"""
+        await self.wait_until_ready()
+        
+        while not self.is_closed():
+            try:
+                # Clean up activity data older than 90 days
+                removed_count = await self.database.cleanup_old_activity(days=90)
+                if removed_count > 0:
+                    self.logger.info(f"Cleaned up {removed_count} old activity records")
+                
+            except Exception as e:
+                self.logger.error(f"Error in cleanup_old_activity_data: {e}")
+            
+            # Run cleanup once per day (86400 seconds)
+            await asyncio.sleep(86400)
+
+    async def cleanup_old_activity_data(self):
         """Background task to clean up old activity data"""
         await self.wait_until_ready()
         

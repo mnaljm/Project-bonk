@@ -110,6 +110,22 @@ class Database:
             )
         """)
         
+        # User activity tracking table
+        await self.connection.execute("""
+            CREATE TABLE IF NOT EXISTS user_activity (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                date DATE NOT NULL,
+                message_count INTEGER DEFAULT 0,
+                voice_minutes INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (guild_id) REFERENCES guild_config(guild_id),
+                UNIQUE(guild_id, user_id, date)
+            )
+        """)
+        
         # Create indexes for better performance
         await self.connection.execute("""
             CREATE INDEX IF NOT EXISTS idx_moderation_cases_guild_user 
@@ -124,6 +140,11 @@ class Database:
         await self.connection.execute("""
             CREATE INDEX IF NOT EXISTS idx_temp_punishments_expires 
             ON temp_punishments(expires_at, active)
+        """)
+        
+        await self.connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_activity_guild_user_date
+            ON user_activity(guild_id, user_id, date)
         """)
         
         await self.connection.commit()
@@ -172,6 +193,37 @@ class Database:
                     "ALTER TABLE automod_settings ADD COLUMN lockdown_manual_override INTEGER DEFAULT 0"
                 )
                 self.logger.info("Added lockdown_manual_override column to automod_settings")
+            
+            # Check if user_activity table exists
+            cursor = await self.connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='user_activity'"
+            )
+            user_activity_exists = await cursor.fetchone()
+            
+            if not user_activity_exists:
+                # Create user_activity table
+                await self.connection.execute("""
+                    CREATE TABLE user_activity (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        guild_id INTEGER NOT NULL,
+                        user_id INTEGER NOT NULL,
+                        date DATE NOT NULL,
+                        message_count INTEGER DEFAULT 0,
+                        voice_minutes INTEGER DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (guild_id) REFERENCES guild_config(guild_id),
+                        UNIQUE(guild_id, user_id, date)
+                    )
+                """)
+                
+                # Create index for user_activity
+                await self.connection.execute("""
+                    CREATE INDEX idx_user_activity_guild_user_date
+                    ON user_activity(guild_id, user_id, date)
+                """)
+                
+                self.logger.info("Created user_activity table and index")
             
             await self.connection.commit()
             self.logger.info("Database migration completed successfully")
@@ -436,6 +488,85 @@ class Database:
     async def clear_lockdown_override(self, guild_id: int) -> bool:
         """Clear manual lockdown override"""
         return await self.update_automod_settings(guild_id, lockdown_manual_override=0)
+
+    # User activity tracking methods
+    async def update_user_activity(self, guild_id: int, user_id: int, message_count: int = 0, voice_minutes: int = 0) -> bool:
+        """Update user activity for today"""
+        from datetime import date
+        today = date.today()
+        
+        try:
+            # Try to update existing record
+            cursor = await self.connection.execute(
+                """UPDATE user_activity 
+                   SET message_count = message_count + ?, 
+                       voice_minutes = voice_minutes + ?,
+                       updated_at = CURRENT_TIMESTAMP
+                   WHERE guild_id = ? AND user_id = ? AND date = ?""",
+                (message_count, voice_minutes, guild_id, user_id, today)
+            )
+            
+            if cursor.rowcount == 0:
+                # No existing record, create new one
+                await self.connection.execute(
+                    """INSERT INTO user_activity (guild_id, user_id, date, message_count, voice_minutes)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (guild_id, user_id, today, message_count, voice_minutes)
+                )
+            
+            await self.connection.commit()
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to update user activity: {e}")
+            return False
+
+    async def get_user_activity(self, guild_id: int, user_id: int, days: int = 30) -> dict:
+        """Get user activity for the last N days"""
+        from datetime import date, timedelta
+        cutoff_date = date.today() - timedelta(days=days)
+        
+        async with self.connection.execute(
+            """SELECT SUM(message_count) as total_messages, SUM(voice_minutes) as total_voice_minutes
+               FROM user_activity 
+               WHERE guild_id = ? AND user_id = ? AND date >= ?""",
+            (guild_id, user_id, cutoff_date)
+        ) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return {
+                    "message_count": row["total_messages"] or 0,
+                    "voice_minutes": row["total_voice_minutes"] or 0
+                }
+            return {"message_count": 0, "voice_minutes": 0}
+
+    async def get_top_active_users(self, guild_id: int, days: int = 30, limit: int = 50) -> list:
+        """Get top active users in a guild"""
+        from datetime import date, timedelta
+        cutoff_date = date.today() - timedelta(days=days)
+        
+        async with self.connection.execute(
+            """SELECT user_id, SUM(message_count) as total_messages, SUM(voice_minutes) as total_voice_minutes
+               FROM user_activity 
+               WHERE guild_id = ? AND date >= ?
+               GROUP BY user_id
+               ORDER BY (SUM(message_count) + SUM(voice_minutes)/10) DESC
+               LIMIT ?""",
+            (guild_id, cutoff_date, limit)
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    async def cleanup_old_activity(self, days: int = 90) -> int:
+        """Clean up activity data older than specified days"""
+        from datetime import date, timedelta
+        cutoff_date = date.today() - timedelta(days=days)
+        
+        cursor = await self.connection.execute(
+            "DELETE FROM user_activity WHERE date < ?",
+            (cutoff_date,)
+        )
+        await self.connection.commit()
+        return cursor.rowcount
 
     async def close(self):
         """Close the database connection"""

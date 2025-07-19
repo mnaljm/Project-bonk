@@ -61,6 +61,7 @@ class BonkBot(commands.Bot):
             "bot.cogs.logging",
             "bot.cogs.config",
             "bot.cogs.lockdown",
+            "bot.cogs.suggestions",
         ]
         
         for extension in extensions:
@@ -85,6 +86,7 @@ class BonkBot(commands.Bot):
         
         # Start background tasks
         self.loop.create_task(self.cleanup_expired_punishments())
+        self.loop.create_task(self.cleanup_old_activity_data())
 
     async def initialize_existing_guilds(self):
         """Initialize guild configs for all guilds the bot is already in"""
@@ -135,6 +137,23 @@ class BonkBot(commands.Bot):
                 self.logger.error(f"Error in cleanup_expired_punishments: {e}")
             
             await asyncio.sleep(60)  # Check every minute
+
+    async def cleanup_old_activity_data(self):
+        """Background task to clean up old activity data"""
+        await self.wait_until_ready()
+        
+        while not self.is_closed():
+            try:
+                # Clean up activity data older than 90 days
+                deleted_count = await self.database.cleanup_old_activity(days=90)
+                if deleted_count > 0:
+                    self.logger.info(f"Cleaned up {deleted_count} old activity records")
+                
+            except Exception as e:
+                self.logger.error(f"Error in cleanup_old_activity_data: {e}")
+            
+            # Run cleanup once per day (24 hours)
+            await asyncio.sleep(24 * 60 * 60)
 
     async def on_guild_join(self, guild):
         """Called when the bot joins a new guild"""

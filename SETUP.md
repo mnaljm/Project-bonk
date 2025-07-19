@@ -161,6 +161,11 @@ COMMAND_PREFIX=!
 - `/lockdownconfig [setting] [value]` - Configure lockdown settings
 - `/settings` - View all settings
 
+### Moderator Suggestions Commands
+- `/suggest_mods [min_activity] [max_warnings] [limit]` - Get suggestions for potential moderators
+- `/user_activity <user> [days]` - View detailed activity stats for a user  
+- `/activity_leaderboard [limit] [exclude_mods]` - Show most active users in the server
+
 ## Database
 
 The bot uses SQLite by default, storing data in `data/bot.db`. The database includes:
@@ -170,6 +175,7 @@ The bot uses SQLite by default, storing data in `data/bot.db`. The database incl
 - **warnings**: User warnings
 - **temp_punishments**: Temporary bans/timeouts
 - **automod_settings**: Auto-moderation configuration
+- **user_activity**: Daily activity tracking for suggestion system
 
 ## Logging
 

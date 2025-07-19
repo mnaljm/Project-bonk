@@ -10,6 +10,7 @@ A comprehensive Discord moderation bot built with discord.py, featuring slash co
 - 📋 **Case Management**: Track moderation actions
 - 🔧 **Configuration**: Customizable per-server settings
 - 🎯 **Slash Commands**: Modern Discord command interface
+- 🏆 **Moderator Suggestions**: AI-powered suggestions for potential moderators based on activity and clean record
 
 ## Setup
 

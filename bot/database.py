@@ -381,6 +381,9 @@ class Database:
 
     async def create_automod_settings(self, guild_id: int) -> dict:
         """Create default auto-moderation settings"""
+        # Ensure guild_config exists first (required for foreign key constraint)
+        await self.get_guild_config(guild_id)
+        
         await self.connection.execute(
             "INSERT OR IGNORE INTO automod_settings (guild_id) VALUES (?)", (guild_id,)
         )

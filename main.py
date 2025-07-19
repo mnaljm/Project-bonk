@@ -75,6 +75,9 @@ class BonkBot(commands.Bot):
         self.logger.info(f"Logged in as {self.user} (ID: {self.user.id})")
         self.logger.info(f"Bot is ready! Serving {len(self.guilds)} guilds")
         
+        # Initialize guild configs for all existing guilds
+        await self.initialize_existing_guilds()
+        
         # Set bot status
         await self.change_presence(
             activity=discord.Activity(type=discord.ActivityType.watching, name="for rule violations")
@@ -82,6 +85,19 @@ class BonkBot(commands.Bot):
         
         # Start background tasks
         self.loop.create_task(self.cleanup_expired_punishments())
+
+    async def initialize_existing_guilds(self):
+        """Initialize guild configs for all guilds the bot is already in"""
+        self.logger.info("Initializing guild configurations for existing guilds...")
+        
+        for guild in self.guilds:
+            try:
+                await self.database.create_guild_config(guild.id)
+                self.logger.debug(f"Initialized guild config for {guild.name} (ID: {guild.id})")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize guild config for {guild.name} (ID: {guild.id}): {e}")
+        
+        self.logger.info(f"Guild configuration initialization complete for {len(self.guilds)} guilds")
 
     async def cleanup_expired_punishments(self):
         """Background task to clean up expired punishments"""

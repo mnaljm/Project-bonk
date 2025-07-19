@@ -278,6 +278,9 @@ class Utility(commands.Cog):
             "`/removewarning` - Remove a specific warning by ID",
             "`/clearwarnings` - Clear all warnings for a user",
             "`/purge` - Delete multiple messages",
+            "`/case` - Look up a specific moderation case",
+            "`/history` - View moderation history for a user",
+            "`/recent` - View recent moderation actions",
         ]
         
         embed.add_field(

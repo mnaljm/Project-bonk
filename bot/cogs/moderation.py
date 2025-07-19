@@ -746,6 +746,229 @@ class Moderation(commands.Cog):
                 ephemeral=True
             )
 
+    @app_commands.command(name="case", description="Look up a specific moderation case")
+    @app_commands.describe(case_id="The case ID to look up")
+    async def case_lookup(self, interaction: discord.Interaction, case_id: int):
+        """Look up a specific moderation case"""
+        # Check permissions
+        if not await Utils.check_permissions(interaction, ["moderate_members"]):
+            return
+        
+        try:
+            case = await self.bot.database.get_moderation_case(case_id)
+            
+            if not case or case['guild_id'] != interaction.guild.id:
+                await Utils.send_response(
+                    interaction,
+                    embed=Utils.create_error_embed("Case not found or belongs to another server"),
+                    ephemeral=True
+                )
+                return
+            
+            # Get user and moderator objects
+            user = self.bot.get_user(case['user_id']) or await self.bot.fetch_user(case['user_id'])
+            moderator = self.bot.get_user(case['moderator_id']) or await self.bot.fetch_user(case['moderator_id'])
+            
+            # Format the case information
+            embed = Utils.create_embed(
+                title=f"📋 Case #{case['id']}",
+                description=f"**Action:** {case['action_type'].title()}",
+                color=discord.Color.blue(),
+                fields=[
+                    {"name": "User", "value": f"{user.mention if user else 'Unknown User'}\n{user.name if user else 'Unknown'}#{user.discriminator if user else '0000'}\nID: {case['user_id']}", "inline": True},
+                    {"name": "Moderator", "value": f"{moderator.mention if moderator else 'Unknown Moderator'}\n{moderator.name if moderator else 'Unknown'}#{moderator.discriminator if moderator else '0000'}\nID: {case['moderator_id']}", "inline": True},
+                    {"name": "Date", "value": Utils.format_timestamp(datetime.fromisoformat(case['created_at'])), "inline": True},
+                    {"name": "Reason", "value": case['reason'] or "No reason provided", "inline": False}
+                ]
+            )
+            
+            # Add duration if applicable
+            if case['duration']:
+                embed.add_field(
+                    name="Duration", 
+                    value=Utils.format_duration(case['duration']), 
+                    inline=True
+                )
+            
+            # Add status
+            status = "🟢 Active" if case['active'] else "🔴 Inactive"
+            embed.add_field(name="Status", value=status, inline=True)
+            
+            if user:
+                embed.set_thumbnail(url=user.display_avatar.url)
+            
+            await Utils.send_response(interaction, embed=embed)
+            
+        except Exception as e:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_error_embed(f"Failed to look up case: {str(e)}"),
+                ephemeral=True
+            )
+
+    @app_commands.command(name="history", description="View moderation history for a user")
+    @app_commands.describe(
+        user="The user to check history for",
+        limit="Number of cases to show (default: 10, max: 25)"
+    )
+    async def moderation_history(
+        self, 
+        interaction: discord.Interaction, 
+        user: discord.Member,
+        limit: int = 10
+    ):
+        """View moderation history for a user"""
+        # Check permissions
+        if not await Utils.check_permissions(interaction, ["moderate_members"]):
+            return
+        
+        # Validate limit
+        if limit < 1 or limit > 25:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_error_embed("Limit must be between 1 and 25"),
+                ephemeral=True
+            )
+            return
+        
+        try:
+            cases = await self.bot.database.get_user_cases(interaction.guild.id, user.id)
+            
+            if not cases:
+                await Utils.send_response(
+                    interaction,
+                    embed=Utils.create_embed(
+                        title=f"📋 Moderation History - {user.display_name}",
+                        description="No moderation cases found for this user.",
+                        color=discord.Color.green()
+                    )
+                )
+                return
+            
+            # Limit the results
+            cases = cases[:limit]
+            
+            embed = Utils.create_embed(
+                title=f"📋 Moderation History - {user.display_name}",
+                description=f"Showing {len(cases)} of {len(await self.bot.database.get_user_cases(interaction.guild.id, user.id))} total cases",
+                color=discord.Color.blue(),
+                thumbnail=user.display_avatar.url
+            )
+            
+            # Add case information
+            for case in cases:
+                moderator = self.bot.get_user(case['moderator_id'])
+                moderator_name = moderator.name if moderator else "Unknown"
+                
+                status = "🟢" if case['active'] else "🔴"
+                case_info = f"{status} **{case['action_type'].title()}** by {moderator_name}"
+                case_info += f"\n**Reason:** {case['reason'] or 'No reason provided'}"
+                case_info += f"\n**Date:** {Utils.format_timestamp(datetime.fromisoformat(case['created_at']))}"
+                
+                if case['duration']:
+                    case_info += f"\n**Duration:** {Utils.format_duration(case['duration'])}"
+                
+                embed.add_field(
+                    name=f"Case #{case['id']}",
+                    value=case_info,
+                    inline=False
+                )
+            
+            # Add summary at the bottom
+            active_cases = [c for c in await self.bot.database.get_user_cases(interaction.guild.id, user.id) if c['active']]
+            embed.add_field(
+                name="Summary",
+                value=f"**Total Cases:** {len(await self.bot.database.get_user_cases(interaction.guild.id, user.id))}\n**Active Cases:** {len(active_cases)}",
+                inline=False
+            )
+            
+            await Utils.send_response(interaction, embed=embed)
+            
+        except Exception as e:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_error_embed(f"Failed to get moderation history: {str(e)}"),
+                ephemeral=True
+            )
+
+    @app_commands.command(name="recent", description="View recent moderation actions in this server")
+    @app_commands.describe(limit="Number of recent cases to show (default: 10, max: 20)")
+    async def recent_cases(self, interaction: discord.Interaction, limit: int = 10):
+        """View recent moderation actions in the server"""
+        # Check permissions
+        if not await Utils.check_permissions(interaction, ["moderate_members"]):
+            return
+        
+        # Validate limit
+        if limit < 1 or limit > 20:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_error_embed("Limit must be between 1 and 20"),
+                ephemeral=True
+            )
+            return
+        
+        try:
+            # Get recent cases from database
+            async with self.bot.database.connection.execute(
+                """SELECT * FROM moderation_cases 
+                   WHERE guild_id = ? 
+                   ORDER BY created_at DESC 
+                   LIMIT ?""",
+                (interaction.guild.id, limit)
+            ) as cursor:
+                rows = await cursor.fetchall()
+                cases = [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
+            
+            if not cases:
+                await Utils.send_response(
+                    interaction,
+                    embed=Utils.create_embed(
+                        title="📋 Recent Moderation Actions",
+                        description="No moderation cases found for this server.",
+                        color=discord.Color.green()
+                    )
+                )
+                return
+            
+            embed = Utils.create_embed(
+                title="📋 Recent Moderation Actions",
+                description=f"Showing {len(cases)} most recent moderation actions",
+                color=discord.Color.blue()
+            )
+            
+            # Add case information
+            for case in cases:
+                user = self.bot.get_user(case['user_id'])
+                moderator = self.bot.get_user(case['moderator_id'])
+                
+                user_name = user.name if user else f"Unknown User ({case['user_id']})"
+                moderator_name = moderator.name if moderator else f"Unknown Moderator ({case['moderator_id']})"
+                
+                status = "🟢" if case['active'] else "🔴"
+                case_info = f"{status} **{case['action_type'].title()}** on {user_name}"
+                case_info += f"\n**Moderator:** {moderator_name}"
+                case_info += f"\n**Reason:** {case['reason'] or 'No reason provided'}"
+                case_info += f"\n**Date:** {Utils.format_timestamp(datetime.fromisoformat(case['created_at']))}"
+                
+                if case['duration']:
+                    case_info += f"\n**Duration:** {Utils.format_duration(case['duration'])}"
+                
+                embed.add_field(
+                    name=f"Case #{case['id']}",
+                    value=case_info,
+                    inline=False
+                )
+            
+            await Utils.send_response(interaction, embed=embed)
+            
+        except Exception as e:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_error_embed(f"Failed to get recent cases: {str(e)}"),
+                ephemeral=True
+            )
+
 
 async def setup(bot):
     await bot.add_cog(Moderation(bot))

@@ -772,7 +772,7 @@ class Moderation(commands.Cog):
             # Format the case information
             embed = Utils.create_embed(
                 title=f"📋 Case #{case['id']}",
-                description=f"**Action:** {case['action_type'].title()}",
+                description=f"**Action:** {case['case_type'].title()}",
                 color=discord.Color.blue(),
                 fields=[
                     {"name": "User", "value": f"{user.mention if user else 'Unknown User'}\n{user.name if user else 'Unknown'}#{user.discriminator if user else '0000'}\nID: {case['user_id']}", "inline": True},
@@ -861,7 +861,7 @@ class Moderation(commands.Cog):
                 moderator_name = moderator.name if moderator else "Unknown"
                 
                 status = "🟢" if case['active'] else "🔴"
-                case_info = f"{status} **{case['action_type'].title()}** by {moderator_name}"
+                case_info = f"{status} **{case['case_type'].title()}** by {moderator_name}"
                 case_info += f"\n**Reason:** {case['reason'] or 'No reason provided'}"
                 case_info += f"\n**Date:** {Utils.format_timestamp(datetime.fromisoformat(case['created_at']))}"
                 
@@ -946,7 +946,7 @@ class Moderation(commands.Cog):
                 moderator_name = moderator.name if moderator else f"Unknown Moderator ({case['moderator_id']})"
                 
                 status = "🟢" if case['active'] else "🔴"
-                case_info = f"{status} **{case['action_type'].title()}** on {user_name}"
+                case_info = f"{status} **{case['case_type'].title()}** on {user_name}"
                 case_info += f"\n**Moderator:** {moderator_name}"
                 case_info += f"\n**Reason:** {case['reason'] or 'No reason provided'}"
                 case_info += f"\n**Date:** {Utils.format_timestamp(datetime.fromisoformat(case['created_at']))}"

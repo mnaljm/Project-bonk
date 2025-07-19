@@ -1,3 +1,4 @@
+import asyncio
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
@@ -105,6 +106,8 @@ class Lockdown(commands.Cog):
     @check_moderator_availability.before_loop
     async def before_check_moderator_availability(self):
         await self.bot.wait_until_ready()
+        # Add additional delay to ensure guild initialization is complete
+        await asyncio.sleep(10)  # Wait 10 seconds after bot is ready
     
     def get_online_moderators(self, guild: discord.Guild) -> list:
         """Get list of online moderators/admins using multiple detection methods"""

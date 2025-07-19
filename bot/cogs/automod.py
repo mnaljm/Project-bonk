@@ -1,7 +1,7 @@
 import re
 import asyncio
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import discord
 from discord.ext import commands
@@ -64,7 +64,7 @@ class AutoMod(commands.Cog):
             return
         
         user_id = message.author.id
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         
         # Use lockdown threshold if in lockdown mode
         threshold = settings.get("lockdown_spam_threshold", 3) if is_lockdown else settings.get("spam_threshold", 5)
@@ -171,7 +171,7 @@ class AutoMod(commands.Cog):
                 
                 try:
                     # Apply timeout
-                    timeout_until = datetime.now() + timedelta(seconds=timeout_duration)
+                    timeout_until = datetime.now(timezone.utc) + timedelta(seconds=timeout_duration)
                     await message.author.timeout(timeout_until, reason=f"Auto-moderation lockdown: {reason}")
                     
                     # Create moderation case
@@ -262,7 +262,7 @@ class AutoMod(commands.Cog):
         recent_cases = await self.bot.database.get_user_cases(guild.id, user.id)
         
         # Count auto-moderation violations in the last hour
-        one_hour_ago = datetime.now() - timedelta(hours=1)
+        one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
         recent_automod_violations = [
             case for case in recent_cases
             if case["case_type"].startswith("auto_mod_") and
@@ -275,7 +275,7 @@ class AutoMod(commands.Cog):
             # Timeout user for 10 minutes
             try:
                 timeout_duration = 600  # 10 minutes
-                timeout_until = datetime.now() + timedelta(seconds=timeout_duration)
+                timeout_until = datetime.now(timezone.utc) + timedelta(seconds=timeout_duration)
                 
                 await user.timeout(
                     timeout_until,

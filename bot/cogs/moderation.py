@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from bot.utils.utils import Utils
 from bot.utils.logger import log_moderation_action
@@ -96,7 +96,7 @@ class Moderation(commands.Cog):
                 if duration_seconds:
                     dm_embed.add_field(
                         name="Expires",
-                        value=Utils.format_timestamp(datetime.now() + timedelta(seconds=duration_seconds)),
+                        value=Utils.format_timestamp(datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)),
                         inline=False
                     )
                 await user.send(embed=dm_embed)
@@ -112,7 +112,7 @@ class Moderation(commands.Cog):
                     interaction.guild.id,
                     user.id,
                     "ban",
-                    datetime.now() + timedelta(seconds=duration_seconds),
+                    datetime.now(timezone.utc) + timedelta(seconds=duration_seconds),
                     case_id
                 )
             
@@ -282,7 +282,7 @@ class Moderation(commands.Cog):
             )
             
             # Timeout the user
-            timeout_until = datetime.now() + timedelta(seconds=duration_seconds)
+            timeout_until = datetime.now(timezone.utc) + timedelta(seconds=duration_seconds)
             await user.timeout(timeout_until, reason=reason)
             
             # Add temporary punishment

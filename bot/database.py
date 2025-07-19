@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import aiosqlite
@@ -287,7 +287,7 @@ class Database:
         """Create a new moderation case"""
         expires_at = None
         if duration:
-            expires_at = datetime.now() + timedelta(seconds=duration)
+            expires_at = datetime.now(timezone.utc) + timedelta(seconds=duration)
         
         cursor = await self.connection.execute(
             """INSERT INTO moderation_cases 

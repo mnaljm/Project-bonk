@@ -1,6 +1,6 @@
 import asyncio
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Union
 
 import discord
@@ -54,8 +54,17 @@ class Utils:
         return total_seconds if total_seconds > 0 else None
     
     @staticmethod
+    def utcnow() -> datetime:
+        """Get current UTC time with timezone info"""
+        return datetime.now(timezone.utc)
+    
+    @staticmethod
     def format_timestamp(dt: datetime, style: str = "F") -> str:
         """Format a datetime object as a Discord timestamp"""
+        # Handle both timezone-aware and naive datetimes
+        if dt.tzinfo is None:
+            # Assume UTC if no timezone info
+            dt = dt.replace(tzinfo=timezone.utc)
         return f"<t:{int(dt.timestamp())}:{style}>"
     
     # Embed creation utilities
@@ -72,7 +81,7 @@ class Utils:
             title=title,
             description=description,
             color=color or discord.Color.blue(),
-            timestamp=datetime.utcnow() if timestamp else None
+            timestamp=Utils.utcnow() if timestamp else None
         )
         
         if "author" in kwargs:

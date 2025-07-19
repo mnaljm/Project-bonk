@@ -272,13 +272,13 @@ class BotSuggestions(commands.Cog):
 
     @app_commands.command(name="user_activity", description="View detailed activity stats for a user")
     @app_commands.describe(
-        user="The user to view activity for",
+        user="The user to view activity for (can be member or user ID)",
         days="Number of days to look back (default: 30)"
     )
     async def user_activity(
         self, 
         interaction: discord.Interaction, 
-        user: discord.Member,
+        user: str,  # Changed from discord.Member to str to accept both mentions and IDs
         days: int = 30
     ):
         """View detailed activity statistics for a user"""
@@ -287,22 +287,83 @@ class BotSuggestions(commands.Cog):
             return
 
         try:
+            # Parse user input (could be mention, ID, or username)
+            user_id = None
+            user_obj = None
+            
+            # Try to extract user ID from mention format
+            if user.startswith('<@') and user.endswith('>'):
+                user_id_str = user[2:-1]
+                if user_id_str.startswith('!'):
+                    user_id_str = user_id_str[1:]
+                try:
+                    user_id = int(user_id_str)
+                except ValueError:
+                    pass
+            else:
+                # Try to parse as direct user ID
+                try:
+                    user_id = int(user)
+                except ValueError:
+                    # Try to find by username/display name
+                    for member in interaction.guild.members:
+                        if (member.name.lower() == user.lower() or 
+                            member.display_name.lower() == user.lower() or
+                            str(member) == user):
+                            user_id = member.id
+                            user_obj = member
+                            break
+            
+            if user_id is None:
+                await Utils.send_response(
+                    interaction,
+                    embed=Utils.create_error_embed("Could not find user. Please use @mention, user ID, or exact username."),
+                    ephemeral=True
+                )
+                return
+            
+            # Try to get user object (may be None if user left/banned)
+            if user_obj is None:
+                user_obj = interaction.guild.get_member(user_id)
+                if user_obj is None:
+                    # Try to fetch user from Discord API
+                    try:
+                        user_obj = await self.bot.fetch_user(user_id)
+                    except discord.NotFound:
+                        await Utils.send_response(
+                            interaction,
+                            embed=Utils.create_error_embed("User not found."),
+                            ephemeral=True
+                        )
+                        return
+
             # Calculate activity score
-            activity_data = await self.calculate_activity_score(interaction.guild.id, user.id, days)
+            activity_data = await self.calculate_activity_score(interaction.guild.id, user_id, days)
             
             # Get moderation stats
-            mod_stats = await self.get_user_moderation_stats(interaction.guild.id, user.id)
+            mod_stats = await self.get_user_moderation_stats(interaction.guild.id, user_id)
             
-            # Check if user has mod permissions
-            has_mod_perms = self.has_moderation_permissions(user)
+            # Check if user has mod permissions (only if they're still in the server)
+            has_mod_perms = False
+            if isinstance(user_obj, discord.Member):
+                has_mod_perms = self.has_moderation_permissions(user_obj)
             
             # Create embed
+            display_name = getattr(user_obj, 'display_name', getattr(user_obj, 'name', f'User {user_id}'))
             embed = Utils.create_embed(
-                title=f"📊 Activity Report - {user.display_name}",
-                description=f"Activity statistics for {user.mention}",
+                title=f"📊 Activity Report - {display_name}",
+                description=f"Activity statistics for {user_obj.mention if hasattr(user_obj, 'mention') else f'User ID: {user_id}'}",
                 color=discord.Color.blue(),
-                thumbnail=user.display_avatar.url
+                thumbnail=getattr(user_obj, 'display_avatar', getattr(user_obj, 'avatar', None))
             )
+            
+            # Add status indicator for banned/left users
+            if not isinstance(user_obj, discord.Member):
+                embed.add_field(
+                    name="⚠️ Status",
+                    value="This user is no longer in the server (banned/left)",
+                    inline=False
+                )
             
             # Activity section
             embed.add_field(
@@ -327,22 +388,24 @@ class BotSuggestions(commands.Cog):
                 inline=True
             )
             
-            # Permissions section
+            # Permissions section (only if user is still in server)
             perms_text = "✅ Has moderation permissions" if has_mod_perms else "❌ No moderation permissions"
-            if has_mod_perms:
+            if has_mod_perms and isinstance(user_obj, discord.Member):
                 mod_perms = []
-                if user.guild_permissions.administrator:
+                if user_obj.guild_permissions.administrator:
                     mod_perms.append("Administrator")
                 else:
-                    if user.guild_permissions.kick_members:
+                    if user_obj.guild_permissions.kick_members:
                         mod_perms.append("Kick Members")
-                    if user.guild_permissions.ban_members:
+                    if user_obj.guild_permissions.ban_members:
                         mod_perms.append("Ban Members")
-                    if user.guild_permissions.manage_messages:
+                    if user_obj.guild_permissions.manage_messages:
                         mod_perms.append("Manage Messages")
-                    if user.guild_permissions.moderate_members:
+                    if user_obj.guild_permissions.moderate_members:
                         mod_perms.append("Moderate Members")
                 perms_text += f"\n• {', '.join(mod_perms)}"
+            elif not isinstance(user_obj, discord.Member):
+                perms_text = "N/A (User not in server)"
             
             embed.add_field(
                 name="🔑 Permissions",
@@ -356,6 +419,9 @@ class BotSuggestions(commands.Cog):
                 verdict_color = discord.Color.red()
             elif mod_stats['warning_count'] > 0 or mod_stats['bans'] > 0 or mod_stats['kicks'] > 0:
                 verdict = "❌ Has moderation history"
+                verdict_color = discord.Color.red()
+            elif not isinstance(user_obj, discord.Member):
+                verdict = "❌ User not in server"
                 verdict_color = discord.Color.red()
             elif activity_data['total_score'] < 100:
                 verdict = "⚠️ Low activity score"

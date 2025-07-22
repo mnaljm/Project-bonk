@@ -51,8 +51,7 @@ class RoleAssignment(commands.Cog):
                 inline=False
             )
 
-        if available_roles:
-            embed.add_field(
+        if available_roles:            embed.add_field(
                 name="📝 Available to Join",
                 value="\n".join([f"• {role.mention}" for role in available_roles]),
                 inline=False
@@ -60,7 +59,7 @@ class RoleAssignment(commands.Cog):
 
         embed.add_field(
             name="💡 How to Use",
-            value="Use `/join_role` to get a role or `/leave_role` to remove one",
+            value="Use `/join_role` to get a role, `/leave_role` to remove one, or `/toggle_role` to switch",
             inline=False
         )
 
@@ -68,8 +67,27 @@ class RoleAssignment(commands.Cog):
 
     @app_commands.command(name="join_role", description="Join a Gooner role")
     @app_commands.describe(role="The Gooner role you want to join")
-    async def join_role(self, interaction: discord.Interaction, role: discord.Role):
+    async def join_role(self, interaction: discord.Interaction, role: str):
         """Allow users to join a Gooner role"""
+        # Convert role ID string to role object
+        try:
+            role_obj = interaction.guild.get_role(int(role))
+            if not role_obj:
+                await Utils.send_response(
+                    interaction,
+                    embed=Utils.create_error_embed("Role not found."),
+                    ephemeral=True
+                )
+                return
+        except ValueError:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_error_embed("Invalid role ID."),
+                ephemeral=True
+            )
+            return
+
+        role = role_obj  # Use the role object for the rest of the function
         # Check if role is a valid Gooner role
         if "gooner" not in role.name.lower():
             await Utils.send_response(
@@ -127,12 +145,29 @@ class RoleAssignment(commands.Cog):
                 interaction,
                 embed=Utils.create_error_embed(f"Failed to assign role: {str(e)}"),
                 ephemeral=True
-            )
-
-    @app_commands.command(name="leave_role", description="Leave a Gooner role")
+            )    @app_commands.command(name="leave_role", description="Leave a Gooner role")
     @app_commands.describe(role="The Gooner role you want to leave")
-    async def leave_role(self, interaction: discord.Interaction, role: discord.Role):
+    async def leave_role(self, interaction: discord.Interaction, role: str):
         """Allow users to leave a Gooner role"""
+        # Convert role ID string to role object
+        try:
+            role_obj = interaction.guild.get_role(int(role))
+            if not role_obj:
+                await Utils.send_response(
+                    interaction,
+                    embed=Utils.create_error_embed("Role not found."),
+                    ephemeral=True
+                )
+                return
+        except ValueError:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_error_embed("Invalid role ID."),
+                ephemeral=True
+            )
+            return
+
+        role = role_obj  # Use the role object for the rest of the function
         # Check if role is a valid Gooner role
         if "gooner" not in role.name.lower():
             await Utils.send_response(
@@ -219,12 +254,29 @@ class RoleAssignment(commands.Cog):
         return [
             app_commands.Choice(name=role.name, value=str(role.id))
             for role in user_gooner_roles[:25]
-        ]
-
-    @app_commands.command(name="toggle_role", description="Toggle a Gooner role (join if you don't have it, leave if you do)")
+        ]    @app_commands.command(name="toggle_role", description="Toggle a Gooner role (join if you don't have it, leave if you do)")
     @app_commands.describe(role="The Gooner role you want to toggle")
-    async def toggle_role(self, interaction: discord.Interaction, role: discord.Role):
+    async def toggle_role(self, interaction: discord.Interaction, role: str):
         """Toggle a Gooner role - join if not present, leave if present"""
+        # Convert role ID string to role object
+        try:
+            role_obj = interaction.guild.get_role(int(role))
+            if not role_obj:
+                await Utils.send_response(
+                    interaction,
+                    embed=Utils.create_error_embed("Role not found."),
+                    ephemeral=True
+                )
+                return
+        except ValueError:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_error_embed("Invalid role ID."),
+                ephemeral=True
+            )
+            return
+
+        role = role_obj  # Use the role object for the rest of the function
         # Check if role is a valid Gooner role
         if "gooner" not in role.name.lower():
             await Utils.send_response(

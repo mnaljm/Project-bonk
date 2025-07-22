@@ -33,7 +33,8 @@ class BonkBot(commands.Bot):
         # Bot configuration
         self.config = {
             "max_warnings": int(os.getenv("MAX_WARNINGS", 3)),
-            "default_timeout_duration": int(os.getenv("DEFAULT_TIMEOUT_DURATION", 600)),            "guild_id": int(os.getenv("GUILD_ID")) if os.getenv("GUILD_ID") else None,
+            "default_timeout_duration": int(os.getenv("DEFAULT_TIMEOUT_DURATION", 600)),
+        "guild_id": int(os.getenv("GUILD_ID")) if os.getenv("GUILD_ID") else None,
         }
 
     async def setup_hook(self):
@@ -65,6 +66,7 @@ class BonkBot(commands.Bot):
             "bot.cogs.lockdown",
             "bot.cogs.suggestions",
             "bot.cogs.nsfw_management",
+            "bot.cogs.role_assignment",
         ]
         
         for extension in extensions:

@@ -107,33 +107,10 @@ class Logging(commands.Cog):
             fields=fields,
             thumbnail=user.display_avatar.url
         )
-    
-    @commands.Cog.listener()
+      @commands.Cog.listener()
     async def on_member_update(self, before, after):
-        """Log member updates (roles, nickname, timeout)"""
-        # Check for role changes
-        if before.roles != after.roles:
-            added_roles = [role for role in after.roles if role not in before.roles]
-            removed_roles = [role for role in before.roles if role not in after.roles]
-            
-            changes = []
-            if added_roles:
-                changes.append(f"**Added:** {', '.join(role.mention for role in added_roles)}")
-            if removed_roles:
-                changes.append(f"**Removed:** {', '.join(role.mention for role in removed_roles)}")
-            
-            if changes:
-                await self.log_event(
-                    after.guild,
-                    "Member Roles Updated",
-                    f"{after.mention}'s roles were updated",
-                    discord.Color.blue(),
-                    fields=[
-                        {"name": "User", "value": f"{after} ({after.id})", "inline": True},
-                        {"name": "Role Changes", "value": "\n".join(changes), "inline": False},
-                    ],
-                    thumbnail=after.display_avatar.url
-                )
+        """Log member updates (nickname, timeout)"""
+        # Role change logging disabled per user request
         
         # Check for nickname changes
         if before.nick != after.nick:

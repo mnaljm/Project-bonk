@@ -33,15 +33,15 @@ class BonkBot(commands.Bot):
         # Bot configuration
         self.config = {
             "max_warnings": int(os.getenv("MAX_WARNINGS", 3)),
-            "default_timeout_duration": int(os.getenv("DEFAULT_TIMEOUT_DURATION", 600)),
-            "guild_id": int(os.getenv("GUILD_ID")) if os.getenv("GUILD_ID") else None,
+            "default_timeout_duration": int(os.getenv("DEFAULT_TIMEOUT_DURATION", 600)),            "guild_id": int(os.getenv("GUILD_ID")) if os.getenv("GUILD_ID") else None,
         }
 
     async def setup_hook(self):
         """Called when the bot is starting up"""
         await self.database.initialize()
         await self.load_extensions()
-          # Sync commands if guild_id is specified (for development)
+        
+        # Sync commands if guild_id is specified (for development)
         if self.config["guild_id"]:
             guild = discord.Object(id=self.config["guild_id"])
             # Clear any existing guild commands first to prevent duplicates
@@ -139,7 +139,9 @@ class BonkBot(commands.Bot):
             except Exception as e:
                 self.logger.error(f"Error in cleanup_expired_punishments: {e}")
             
-            await asyncio.sleep(60)  # Check every minute    async def cleanup_old_activity_data(self):
+            await asyncio.sleep(60)  # Check every minute
+
+    async def cleanup_old_activity_data(self):
         """Background task to clean up old activity data"""
         await self.wait_until_ready()
         

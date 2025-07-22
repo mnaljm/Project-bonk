@@ -49,8 +49,7 @@ class NSFWManagement(commands.Cog):
 
             # Create category
             category_name = f"{name} NSFW"
-            
-            # Set up permissions for the category
+              # Set up permissions for the category
             overwrites = {
                 interaction.guild.default_role: discord.PermissionOverwrite(
                     view_channel=False,
@@ -74,6 +73,22 @@ class NSFWManagement(commands.Cog):
                     read_message_history=True
                 )
             }
+
+            # Add Moderator role permissions if it exists
+            moderator_role = discord.utils.get(interaction.guild.roles, name="Moderator")
+            if moderator_role:
+                overwrites[moderator_role] = discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    read_messages=True,
+                    read_message_history=True,
+                    manage_messages=True,
+                    attach_files=True,
+                    embed_links=True,
+                    add_reactions=True,
+                    use_external_emojis=True,
+                    manage_threads=True
+                )
 
             category = await interaction.guild.create_category(
                 name=category_name,
@@ -125,12 +140,13 @@ class NSFWManagement(commands.Cog):
             embed.add_field(
                 name="📺 Channels Created",
                 value=channel_list,
-                inline=False
-            )
+                inline=False            )
             
             embed.add_field(
                 name="🔒 Access Control",
-                value=f"Only members with the {role.mention} role can access these channels.",
+                value=f"Only members with the {role.mention} role can access these channels." + 
+                      (f"\nModerators can also view and moderate these channels." if moderator_role else 
+                       f"\n⚠️ No 'Moderator' role found - only {role.mention} members have access."),
                 inline=False
             )
             
@@ -140,10 +156,9 @@ class NSFWManagement(commands.Cog):
                 inline=False
             )
 
-            await Utils.send_response(interaction, embed=embed)
-
-            # Log the action
-            self.bot.logger.info(f"NSFW setup completed by {interaction.user} in {interaction.guild.name}: Role '{role_name}', Category '{category_name}', {len(created_channels)} channels")
+            await Utils.send_response(interaction, embed=embed)            # Log the action
+            moderator_access = "with Moderator role access" if moderator_role else "without Moderator role (not found)"
+            self.bot.logger.info(f"NSFW setup completed by {interaction.user} in {interaction.guild.name}: Role '{role_name}', Category '{category_name}', {len(created_channels)} channels, {moderator_access}")
 
         except discord.Forbidden:
             await Utils.send_response(

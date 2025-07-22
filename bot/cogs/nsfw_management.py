@@ -253,6 +253,38 @@ class NSFWManagement(commands.Cog):
                 ephemeral=True
             )
 
+    @app_commands.command(name="clear_commands", description="Clear all slash commands (Admin only)")
+    async def clear_commands(self, interaction: discord.Interaction):
+        """Clear all slash commands to fix duplicates"""
+        # Check permissions - only administrators
+        if not interaction.user.guild_permissions.administrator:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_error_embed("Only administrators can use this command."),
+                ephemeral=True
+            )
+            return
+
+        try:
+            # Clear guild commands
+            interaction.client.tree.clear_commands(guild=interaction.guild)
+            await interaction.client.tree.sync(guild=interaction.guild)
+            
+            embed = Utils.create_success_embed(
+                "All slash commands have been cleared from this server. The bot will need to be restarted to re-register commands.",
+                "Commands Cleared"
+            )
+            await Utils.send_response(interaction, embed=embed, ephemeral=True)
+            
+            self.bot.logger.info(f"Commands cleared by {interaction.user} in {interaction.guild.name}")
+            
+        except Exception as e:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_error_embed(f"Failed to clear commands: {str(e)}"),
+                ephemeral=True
+            )
+
 
 async def setup(bot):
     await bot.add_cog(NSFWManagement(bot))

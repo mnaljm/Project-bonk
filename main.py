@@ -41,10 +41,12 @@ class BonkBot(commands.Bot):
         """Called when the bot is starting up"""
         await self.database.initialize()
         await self.load_extensions()
-        
-        # Sync commands if guild_id is specified (for development)
+          # Sync commands if guild_id is specified (for development)
         if self.config["guild_id"]:
             guild = discord.Object(id=self.config["guild_id"])
+            # Clear any existing guild commands first to prevent duplicates
+            self.tree.clear_commands(guild=guild)
+            # Copy global commands to guild for faster testing
             self.tree.copy_global_to(guild=guild)
             await self.tree.sync(guild=guild)
             self.logger.info(f"Commands synced to guild {self.config['guild_id']}")
@@ -137,26 +139,7 @@ class BonkBot(commands.Bot):
             except Exception as e:
                 self.logger.error(f"Error in cleanup_expired_punishments: {e}")
             
-            await asyncio.sleep(60)  # Check every minute
-
-    async def cleanup_old_activity_data(self):
-        """Periodically clean up old activity data"""
-        await self.wait_until_ready()
-        
-        while not self.is_closed():
-            try:
-                # Clean up activity data older than 90 days
-                removed_count = await self.database.cleanup_old_activity(days=90)
-                if removed_count > 0:
-                    self.logger.info(f"Cleaned up {removed_count} old activity records")
-                
-            except Exception as e:
-                self.logger.error(f"Error in cleanup_old_activity_data: {e}")
-            
-            # Run cleanup once per day (86400 seconds)
-            await asyncio.sleep(86400)
-
-    async def cleanup_old_activity_data(self):
+            await asyncio.sleep(60)  # Check every minute    async def cleanup_old_activity_data(self):
         """Background task to clean up old activity data"""
         await self.wait_until_ready()
         

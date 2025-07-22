@@ -51,7 +51,8 @@ class RoleAssignment(commands.Cog):
                 inline=False
             )
 
-        if available_roles:            embed.add_field(
+        if available_roles:
+            embed.add_field(
                 name="📝 Available to Join",
                 value="\n".join([f"• {role.mention}" for role in available_roles]),
                 inline=False
@@ -88,6 +89,7 @@ class RoleAssignment(commands.Cog):
             return
 
         role = role_obj  # Use the role object for the rest of the function
+        
         # Check if role is a valid Gooner role
         if "gooner" not in role.name.lower():
             await Utils.send_response(
@@ -145,7 +147,9 @@ class RoleAssignment(commands.Cog):
                 interaction,
                 embed=Utils.create_error_embed(f"Failed to assign role: {str(e)}"),
                 ephemeral=True
-            )    @app_commands.command(name="leave_role", description="Leave a Gooner role")
+            )
+
+    @app_commands.command(name="leave_role", description="Leave a Gooner role")
     @app_commands.describe(role="The Gooner role you want to leave")
     async def leave_role(self, interaction: discord.Interaction, role: str):
         """Allow users to leave a Gooner role"""
@@ -168,6 +172,7 @@ class RoleAssignment(commands.Cog):
             return
 
         role = role_obj  # Use the role object for the rest of the function
+        
         # Check if role is a valid Gooner role
         if "gooner" not in role.name.lower():
             await Utils.send_response(
@@ -218,43 +223,7 @@ class RoleAssignment(commands.Cog):
                 ephemeral=True
             )
 
-    @join_role.autocomplete('role')
-    async def join_role_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
-        """Autocomplete for join_role command - shows available Gooner roles"""
-        gooner_roles = self.get_gooner_roles(interaction.guild)
-        user_role_ids = [role.id for role in interaction.user.roles]
-        
-        # Only show roles the user doesn't have
-        available_roles = [role for role in gooner_roles if role.id not in user_role_ids]
-        
-        # Filter by current input
-        if current:
-            available_roles = [role for role in available_roles if current.lower() in role.name.lower()]
-        
-        # Return up to 25 choices (Discord limit)
-        return [
-            app_commands.Choice(name=role.name, value=str(role.id))
-            for role in available_roles[:25]
-        ]
-
-    @leave_role.autocomplete('role')
-    async def leave_role_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
-        """Autocomplete for leave_role command - shows user's current Gooner roles"""
-        gooner_roles = self.get_gooner_roles(interaction.guild)
-        user_role_ids = [role.id for role in interaction.user.roles]
-        
-        # Only show roles the user has
-        user_gooner_roles = [role for role in gooner_roles if role.id in user_role_ids]
-        
-        # Filter by current input
-        if current:
-            user_gooner_roles = [role for role in user_gooner_roles if current.lower() in role.name.lower()]
-        
-        # Return up to 25 choices (Discord limit)
-        return [
-            app_commands.Choice(name=role.name, value=str(role.id))
-            for role in user_gooner_roles[:25]
-        ]    @app_commands.command(name="toggle_role", description="Toggle a Gooner role (join if you don't have it, leave if you do)")
+    @app_commands.command(name="toggle_role", description="Toggle a Gooner role (join if you don't have it, leave if you do)")
     @app_commands.describe(role="The Gooner role you want to toggle")
     async def toggle_role(self, interaction: discord.Interaction, role: str):
         """Toggle a Gooner role - join if not present, leave if present"""
@@ -277,6 +246,7 @@ class RoleAssignment(commands.Cog):
             return
 
         role = role_obj  # Use the role object for the rest of the function
+        
         # Check if role is a valid Gooner role
         if "gooner" not in role.name.lower():
             await Utils.send_response(
@@ -344,6 +314,44 @@ class RoleAssignment(commands.Cog):
                 embed=Utils.create_error_embed(f"Failed to toggle role: {str(e)}"),
                 ephemeral=True
             )
+
+    @join_role.autocomplete('role')
+    async def join_role_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
+        """Autocomplete for join_role command - shows available Gooner roles"""
+        gooner_roles = self.get_gooner_roles(interaction.guild)
+        user_role_ids = [role.id for role in interaction.user.roles]
+        
+        # Only show roles the user doesn't have
+        available_roles = [role for role in gooner_roles if role.id not in user_role_ids]
+        
+        # Filter by current input
+        if current:
+            available_roles = [role for role in available_roles if current.lower() in role.name.lower()]
+        
+        # Return up to 25 choices (Discord limit)
+        return [
+            app_commands.Choice(name=role.name, value=str(role.id))
+            for role in available_roles[:25]
+        ]
+
+    @leave_role.autocomplete('role')
+    async def leave_role_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
+        """Autocomplete for leave_role command - shows user's current Gooner roles"""
+        gooner_roles = self.get_gooner_roles(interaction.guild)
+        user_role_ids = [role.id for role in interaction.user.roles]
+        
+        # Only show roles the user has
+        user_gooner_roles = [role for role in gooner_roles if role.id in user_role_ids]
+        
+        # Filter by current input
+        if current:
+            user_gooner_roles = [role for role in user_gooner_roles if current.lower() in role.name.lower()]
+        
+        # Return up to 25 choices (Discord limit)
+        return [
+            app_commands.Choice(name=role.name, value=str(role.id))
+            for role in user_gooner_roles[:25]
+        ]
 
     @toggle_role.autocomplete('role')
     async def toggle_role_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:

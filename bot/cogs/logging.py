@@ -102,12 +102,12 @@ class Logging(commands.Cog):
         await self.log_event(
             guild,
             "Member Unbanned",
-            f"{user.mention} was unbanned from the server",
-            discord.Color.green(),
+            f"{user.mention} was unbanned from the server",            discord.Color.green(),
             fields=fields,
             thumbnail=user.display_avatar.url
         )
-      @commands.Cog.listener()
+
+    @commands.Cog.listener()
     async def on_member_update(self, before, after):
         """Log member updates (nickname, timeout)"""
         # Role change logging disabled per user request

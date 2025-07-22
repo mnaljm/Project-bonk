@@ -113,7 +113,7 @@ class NSFWManagement(commands.Cog):
                     name=channel_info["name"],
                     category=category,
                     topic=channel_info["topic"],
-                    nsfw=True,
+                    nsfw=False,
                     reason=f"NSFW setup by {interaction.user}"
                 )
                 created_channels.append(channel)

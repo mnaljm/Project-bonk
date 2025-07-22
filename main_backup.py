@@ -30,13 +30,12 @@ class BonkBot(commands.Bot):
         self.database = Database()
         self.logger = logging.getLogger(__name__)
         
-        # Bot configuration
-        self.config = {
+        # Bot configuration        self.config = {
             "max_warnings": int(os.getenv("MAX_WARNINGS", 3)),
             "default_timeout_duration": int(os.getenv("DEFAULT_TIMEOUT_DURATION", 600)),
             "guild_id": int(os.getenv("GUILD_ID")) if os.getenv("GUILD_ID") else None,
         }
-
+        
     async def setup_hook(self):
         """Called when the bot is starting up"""
         await self.database.initialize()
@@ -49,9 +48,8 @@ class BonkBot(commands.Bot):
             await self.tree.sync(guild=guild)
             self.logger.info(f"Commands synced to guild {self.config['guild_id']}")
         else:
-            await self.tree.sync()
-            self.logger.info("Commands synced globally")
-
+            await self.tree.sync()            self.logger.info("Commands synced globally")
+            
     async def load_extensions(self):
         """Load all bot extensions"""
         extensions = [

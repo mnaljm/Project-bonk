@@ -42,7 +42,6 @@ class NSFWManagement(commands.Cog):
             role_name = f"{name} Gooner"
             role = await interaction.guild.create_role(
                 name=role_name,
-                color=discord.Color.purple(),
                 mentionable=False,
                 reason=f"NSFW setup by {interaction.user}"
             )

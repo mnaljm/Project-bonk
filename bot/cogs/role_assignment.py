@@ -51,8 +51,7 @@ class RoleAssignment(commands.Cog):
                 inline=False
             )
 
-        if available_roles:
-            embed.add_field(
+        if available_roles:            embed.add_field(
                 name="📝 Available to Join",
                 value="\n".join([f"• {role.mention}" for role in available_roles]),
                 inline=False
@@ -60,7 +59,7 @@ class RoleAssignment(commands.Cog):
 
         embed.add_field(
             name="💡 How to Use",
-            value="Use `/join_role` to get a role, `/leave_role` to remove one, or `/toggle_role` to switch",
+            value="• `/join_role` - Get a specific role\n• `/leave_role` - Remove a specific role\n• `/toggle_role` - Switch a role on/off\n• `/join_all_roles` - Get all available roles\n• `/leave_all_roles` - Remove all your roles",
             inline=False
         )
 
@@ -312,6 +311,179 @@ class RoleAssignment(commands.Cog):
             await Utils.send_response(
                 interaction,
                 embed=Utils.create_error_embed(f"Failed to toggle role: {str(e)}"),
+                ephemeral=True
+            )
+
+    @app_commands.command(name="join_all_roles", description="Join all available Gooner roles")
+    async def join_all_roles(self, interaction: discord.Interaction):
+        """Allow users to join all available Gooner roles"""
+        gooner_roles = self.get_gooner_roles(interaction.guild)
+        
+        if not gooner_roles:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_info_embed(
+                    "No Gooner roles are currently available for assignment.",
+                    "No Roles Available"
+                ),
+                ephemeral=True
+            )
+            return
+
+        # Get roles the user doesn't have
+        user_role_ids = [role.id for role in interaction.user.roles]
+        available_roles = [role for role in gooner_roles if role.id not in user_role_ids]
+        
+        if not available_roles:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_info_embed(
+                    "You already have all available Gooner roles!",
+                    "All Roles Assigned"
+                ),
+                ephemeral=True
+            )
+            return
+
+        # Filter out roles that the bot can't manage
+        manageable_roles = []
+        unmanageable_roles = []
+        
+        for role in available_roles:
+            if role.managed or role >= interaction.guild.me.top_role:
+                unmanageable_roles.append(role)
+            else:
+                manageable_roles.append(role)
+
+        if not manageable_roles:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_error_embed(
+                    "None of the available Gooner roles can be assigned by the bot.",
+                    "No Manageable Roles"
+                ),
+                ephemeral=True
+            )
+            return
+
+        try:
+            # Add all manageable roles to the user
+            await interaction.user.add_roles(*manageable_roles, reason=f"Self-assigned all Gooner roles")
+            
+            embed = Utils.create_success_embed(
+                f"Successfully joined {len(manageable_roles)} Gooner role(s)!",
+                "All Roles Added"
+            )
+            
+            role_list = "\n".join([f"• {role.mention}" for role in manageable_roles])
+            embed.add_field(
+                name="🎉 Roles Added",
+                value=role_list,
+                inline=False
+            )
+            
+            if unmanageable_roles:
+                unmanageable_list = "\n".join([f"• {role.mention}" for role in unmanageable_roles])
+                embed.add_field(
+                    name="⚠️ Roles Not Added",
+                    value=f"The following roles could not be assigned:\n{unmanageable_list}",
+                    inline=False
+                )
+            
+            embed.add_field(
+                name="🌟 Welcome!",
+                value="You now have access to all available NSFW content areas!",
+                inline=False
+            )
+            
+            await Utils.send_response(interaction, embed=embed, ephemeral=True)
+            
+            # Log the action
+            role_names = [role.name for role in manageable_roles]
+            self.bot.logger.info(f"User {interaction.user} self-assigned all Gooner roles ({', '.join(role_names)}) in {interaction.guild.name}")
+
+        except discord.Forbidden:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_error_embed("I don't have permission to assign some or all of these roles."),
+                ephemeral=True
+            )
+        except discord.HTTPException as e:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_error_embed(f"Failed to assign roles: {str(e)}"),
+                ephemeral=True
+            )
+
+    @app_commands.command(name="leave_all_roles", description="Leave all Gooner roles")
+    async def leave_all_roles(self, interaction: discord.Interaction):
+        """Allow users to leave all Gooner roles"""
+        gooner_roles = self.get_gooner_roles(interaction.guild)
+        
+        if not gooner_roles:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_info_embed(
+                    "No Gooner roles are currently available.",
+                    "No Roles Available"
+                ),
+                ephemeral=True
+            )
+            return
+
+        # Get roles the user has
+        user_role_ids = [role.id for role in interaction.user.roles]
+        user_gooner_roles = [role for role in gooner_roles if role.id in user_role_ids]
+        
+        if not user_gooner_roles:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_info_embed(
+                    "You don't have any Gooner roles to remove.",
+                    "No Roles to Remove"
+                ),
+                ephemeral=True
+            )
+            return
+
+        try:
+            # Remove all Gooner roles from the user
+            await interaction.user.remove_roles(*user_gooner_roles, reason=f"Self-removed all Gooner roles")
+            
+            embed = Utils.create_success_embed(
+                f"Successfully left {len(user_gooner_roles)} Gooner role(s)!",
+                "All Roles Removed"
+            )
+            
+            role_list = "\n".join([f"• {role.mention}" for role in user_gooner_roles])
+            embed.add_field(
+                name="👋 Roles Removed",
+                value=role_list,
+                inline=False
+            )
+            
+            embed.add_field(
+                name="🔒 Access Removed",
+                value="You no longer have access to any NSFW content areas.",
+                inline=False
+            )
+            
+            await Utils.send_response(interaction, embed=embed, ephemeral=True)
+            
+            # Log the action
+            role_names = [role.name for role in user_gooner_roles]
+            self.bot.logger.info(f"User {interaction.user} self-removed all Gooner roles ({', '.join(role_names)}) in {interaction.guild.name}")
+
+        except discord.Forbidden:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_error_embed("I don't have permission to remove some or all of these roles."),
+                ephemeral=True
+            )
+        except discord.HTTPException as e:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_error_embed(f"Failed to remove roles: {str(e)}"),
                 ephemeral=True
             )
 

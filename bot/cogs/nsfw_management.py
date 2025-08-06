@@ -12,16 +12,18 @@ class NSFWManagement(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="setup_nsfw", description="Set up NSFW category with channels and role")
+    @app_commands.command(name="setup_nsfw", description="Set up NSFW category with channels, role, and responsible user")
     @app_commands.describe(
-        name="The name prefix for the NSFW category and role (e.g., 'Anime' -> 'Anime NSFW' category and 'Anime Gooner' role)"
+        name="The name prefix for the NSFW category and role (e.g., 'Anime' -> 'Anime NSFW' category and 'Anime Gooner' role)",
+        responsible="The user responsible for this NSFW category"
     )
     async def setup_nsfw(
         self,
         interaction: discord.Interaction,
-        name: str
+        name: str,
+        responsible: discord.Member = None
     ):
-        """Set up NSFW category with channels and role"""
+        """Set up NSFW category with channels, role, and responsible user"""
         # Check permissions
         if not await Utils.check_permissions(interaction, ["manage_channels", "manage_roles"]):
             return
@@ -96,6 +98,10 @@ class NSFWManagement(commands.Cog):
                 reason=f"NSFW setup by {interaction.user}"
             )
 
+            # Save responsible user info (store in category topic for simplicity)
+            if responsible:
+                await category.edit(topic=f"Responsible: {responsible.id}")
+
             # Define channels to create
             channels_to_create = [
                 {"name": "dm-requests", "topic": "Request DMs and private content"},
@@ -149,6 +155,13 @@ class NSFWManagement(commands.Cog):
                        f"\n⚠️ No 'Moderator' role found - only {role.mention} members have access."),
                 inline=False
             )
+            
+            if responsible:
+                embed.add_field(
+                    name="👤 Responsible User",
+                    value=f"{responsible.mention}",
+                    inline=False
+                )
             
             embed.add_field(
                 name="ℹ️ Next Steps",
@@ -391,11 +404,26 @@ class NSFWManagement(commands.Cog):
         deleted_categories = []
         deleted_roles = []
         for category in categories_to_delete:
+            # Try to get responsible user from category topic
+            responsible_id = None
+            if category.topic and category.topic.startswith("Responsible: "):
+                try:
+                    responsible_id = int(category.topic.split(": ", 1)[1].strip())
+                except Exception:
+                    responsible_id = None
             try:
                 for channel in category.text_channels:
                     await channel.delete(reason=f"Pruned due to inactivity (>{days} days) by {interaction.user}")
                 await category.delete(reason=f"Pruned due to inactivity (>{days} days) by {interaction.user}")
                 deleted_categories.append(category.name)
+                # DM responsible user if found
+                if responsible_id:
+                    user = interaction.guild.get_member(responsible_id)
+                    if user:
+                        try:
+                            await user.send(f"Your NSFW category '{category.name}' was purged due to inactivity.")
+                        except Exception:
+                            pass
             except Exception:
                 continue
         for role in roles_to_delete:

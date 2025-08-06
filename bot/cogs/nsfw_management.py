@@ -2,9 +2,30 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from datetime import timedelta
+import json
+import os
 
 from bot.utils.utils import Utils
 
+NSFW_RESPONSIBLES_PATH = os.path.join(os.path.dirname(__file__), '..', 'nsfw_responsibles.json')
+
+def set_responsible(category_id: int, user_id: int):
+    try:
+        with open(NSFW_RESPONSIBLES_PATH, 'r') as f:
+            data = json.load(f)
+    except Exception:
+        data = {}
+    data[str(category_id)] = user_id
+    with open(NSFW_RESPONSIBLES_PATH, 'w') as f:
+        json.dump(data, f)
+
+def get_responsible(category_id: int):
+    try:
+        with open(NSFW_RESPONSIBLES_PATH, 'r') as f:
+            data = json.load(f)
+        return data.get(str(category_id))
+    except Exception:
+        return None
 
 class NSFWManagement(commands.Cog):
     """NSFW content management functionality"""
@@ -98,9 +119,9 @@ class NSFWManagement(commands.Cog):
                 reason=f"NSFW setup by {interaction.user}"
             )
 
-            # Save responsible user info (store in category topic for simplicity)
+            # Save responsible user info (store in JSON file, not topic)
             if responsible:
-                await category.edit(topic=f"Responsible: {responsible.id}")
+                set_responsible(category.id, responsible.id)
 
             # Define channels to create
             channels_to_create = [
@@ -404,13 +425,8 @@ class NSFWManagement(commands.Cog):
         deleted_categories = []
         deleted_roles = []
         for category in categories_to_delete:
-            # Try to get responsible user from category topic
-            responsible_id = None
-            if category.topic and category.topic.startswith("Responsible: "):
-                try:
-                    responsible_id = int(category.topic.split(": ", 1)[1].strip())
-                except Exception:
-                    responsible_id = None
+            # Get responsible user from JSON file
+            responsible_id = get_responsible(category.id)
             try:
                 for channel in category.text_channels:
                     await channel.delete(reason=f"Pruned due to inactivity (>{days} days) by {interaction.user}")

@@ -325,9 +325,7 @@ class RoleAssignment(commands.Cog):
 
     @app_commands.command(name="join_all_roles", description="Join all available Gooner roles")
     async def join_all_roles(self, interaction: discord.Interaction):
-        if not is_superuser(interaction.user):
-            if not await Utils.check_permissions(interaction, ["manage_roles"]):
-                return
+        # No permission checks; any user can use this command
         """Allow users to join all available Gooner roles"""
         gooner_roles = self.get_gooner_roles(interaction.guild)
         

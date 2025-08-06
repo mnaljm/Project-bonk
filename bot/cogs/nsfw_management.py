@@ -300,11 +300,11 @@ class NSFWManagement(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="prune_nsfw_inactive", description="List or close inactive NSFW channels and associated roles")
+    @app_commands.command(name="prune_nsfw_inactive", description="List or close inactive NSFW categories and associated roles")
     @app_commands.describe(
-        days="Number of days of inactivity before a channel is considered for closure (default: 30)",
+        days="Number of days of inactivity before a category is considered for closure (default: 30)",
         name="The name prefix for the NSFW category (optional, leave blank to check all NSFW categories)",
-        dry_run="If true, only list inactive channels and roles without deleting them (default: False)"
+        dry_run="If true, only list inactive categories and roles without deleting them (default: False)"
     )
     async def prune_nsfw_inactive(
         self,
@@ -313,7 +313,7 @@ class NSFWManagement(commands.Cog):
         name: str = None,
         dry_run: bool = False
     ):
-        """List or close inactive NSFW channels and associated roles"""
+        """List or close inactive NSFW categories and associated roles"""
         # Check permissions
         if not await Utils.check_permissions(interaction, ["manage_channels", "manage_roles"]):
             return
@@ -321,125 +321,115 @@ class NSFWManagement(commands.Cog):
             return
 
         threshold = discord.utils.utcnow() - timedelta(days=days)
-        closed_channels = []
-        checked_channels = 0
-        roles_to_delete = set()
-        categories_to_delete = set()
-        channels_by_category = {}
+        checked_categories = 0
+        categories_to_delete = []
+        roles_to_delete = []
 
         # Find NSFW categories (optionally filter by name)
         nsfw_categories = [cat for cat in interaction.guild.categories if (name is None or cat.name == f"{name} NSFW")]
         if not nsfw_categories:
             await Utils.send_response(
                 interaction,
-                embed=Utils.create_error_embed(f"No NSFW categories found{' with name ' + name if name else ''}."),
+                embed=Utils.create_error_embed(f"No NSFW categories found{' with name ' + name if name else ''}.") ,
                 ephemeral=True
             )
             return
 
         for category in nsfw_categories:
-            inactive_channels = []
+            checked_categories += 1
+            all_inactive = True
             for channel in category.text_channels:
-                checked_channels += 1
-                # Fetch last message
                 try:
                     last_message = None
                     async for msg in channel.history(limit=1, oldest_first=False):
                         last_message = msg
                         break
-                    if not last_message or last_message.created_at < threshold:
-                        inactive_channels.append(channel)
+                    if last_message and last_message.created_at >= threshold:
+                        all_inactive = False
+                        break
                 except discord.Forbidden:
                     continue  # Skip channels we can't access
                 except Exception:
                     continue
-            if inactive_channels:
-                channels_by_category[category] = inactive_channels
-
-        # Determine roles to delete if all channels in a category are inactive
-        for category, channels in channels_by_category.items():
-            if len(channels) == len(category.text_channels):
+            if all_inactive and category.text_channels:
+                categories_to_delete.append(category)
                 # Try to find the associated role
                 prefix = category.name[:-5] if category.name.endswith(" NSFW") else category.name
                 role_name = f"{prefix} Gooner"
                 role = discord.utils.get(interaction.guild.roles, name=role_name)
                 if role:
-                    roles_to_delete.add(role)
-                categories_to_delete.add(category)
+                    roles_to_delete.append(role)
 
         # Dry run: only list
         if dry_run:
             embed = Utils.create_success_embed(
-                f"Inactive NSFW channels and roles that would be deleted (dry run)",
+                f"Inactive NSFW categories and roles that would be deleted (dry run)",
                 "NSFW Prune Preview"
             )
-            if channels_by_category:
-                for category, channels in channels_by_category.items():
-                    embed.add_field(
-                        name=f"Category: {category.name}",
-                        value="\n".join([f"• {ch.name}" for ch in channels]),
-                        inline=False
-                    )
+            if categories_to_delete:
+                embed.add_field(
+                    name="Categories to Delete",
+                    value="\n".join([f"• {cat.name}" for cat in categories_to_delete]),
+                    inline=False
+                )
             else:
                 embed.add_field(
-                    name="No Inactive Channels",
-                    value=f"Checked {checked_channels} channel(s).",
+                    name="No Inactive Categories",
+                    value=f"Checked {checked_categories} category(ies).",
                     inline=False
                 )
             if roles_to_delete:
                 embed.add_field(
-                    name="Roles to Delete (if all channels in category are inactive)",
+                    name="Roles to Delete (if category is deleted)",
                     value="\n".join([f"• {role.name}" for role in roles_to_delete]),
                     inline=False
                 )
             await Utils.send_response(interaction, embed=embed, ephemeral=True)
             return
 
-        # Actually delete inactive channels and roles
-        for category, channels in channels_by_category.items():
-            for channel in channels:
-                try:
+        # Actually delete inactive categories and roles
+        deleted_categories = []
+        deleted_roles = []
+        for category in categories_to_delete:
+            try:
+                for channel in category.text_channels:
                     await channel.delete(reason=f"Pruned due to inactivity (>{days} days) by {interaction.user}")
-                    closed_channels.append(channel.name)
-                except Exception:
-                    continue
-            # If all channels in category were deleted, delete the category and associated role
-            if len(channels) == len(category.text_channels):
-                try:
-                    await category.delete(reason=f"Pruned due to inactivity (>{days} days) by {interaction.user}")
-                except Exception:
-                    pass
+                await category.delete(reason=f"Pruned due to inactivity (>{days} days) by {interaction.user}")
+                deleted_categories.append(category.name)
+            except Exception:
+                continue
         for role in roles_to_delete:
             try:
                 await role.delete(reason=f"Pruned due to inactivity (>{days} days) by {interaction.user}")
+                deleted_roles.append(role.name)
             except Exception:
-                pass
+                continue
 
         # Report results
-        if closed_channels or roles_to_delete:
+        if deleted_categories or deleted_roles:
             embed = Utils.create_success_embed(
-                f"Closed {len(closed_channels)} inactive NSFW channel(s) and {len(roles_to_delete)} role(s).",
+                f"Closed {len(deleted_categories)} inactive NSFW category(ies) and {len(deleted_roles)} role(s).",
                 "NSFW Prune Complete"
             )
-            if closed_channels:
+            if deleted_categories:
                 embed.add_field(
-                    name="🗑️ Channels Closed",
-                    value="\n".join([f"• {ch}" for ch in closed_channels]),
+                    name="🗑️ Categories Closed",
+                    value="\n".join([f"• {cat}" for cat in deleted_categories]),
                     inline=False
                 )
-            if roles_to_delete:
+            if deleted_roles:
                 embed.add_field(
                     name="Roles Deleted",
-                    value="\n".join([f"• {role.name}" for role in roles_to_delete]),
+                    value="\n".join([f"• {role}" for role in deleted_roles]),
                     inline=False
                 )
         else:
             embed = Utils.create_success_embed(
-                f"No inactive NSFW channels or roles found (checked {checked_channels} channel(s)).",
+                f"No inactive NSFW categories or roles found (checked {checked_categories} category(ies)).",
                 "NSFW Prune Complete"
             )
         await Utils.send_response(interaction, embed=embed, ephemeral=True)
-        self.bot.logger.info(f"NSFW prune by {interaction.user} in {interaction.guild.name}: {len(closed_channels)} channels and {len(roles_to_delete)} roles closed.")
+        self.bot.logger.info(f"NSFW prune by {interaction.user} in {interaction.guild.name}: {len(deleted_categories)} categories and {len(deleted_roles)} roles closed.")
 
 
 async def setup(bot):

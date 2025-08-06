@@ -4,7 +4,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 from datetime import datetime, timedelta
 
-from bot.utils.utils import Utils
+from bot.utils.utils import Utils, is_superuser
 from bot.utils.logger import log_moderation_action
 
 
@@ -233,12 +233,18 @@ class Lockdown(commands.Cog):
     async def lockdown(
         self,
         interaction: discord.Interaction,
-        action: str,
-        reason: str = "Manual action"
+        reason: str = None
     ):
         """Manage lockdown mode"""
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["manage_channels"]):
+                return
+        
         # Check permissions
-        if not await Utils.check_permissions(interaction, ["administrator"]):
+        if is_superuser(interaction.user):
+            pass  # allow superuser bypass
+        #     # existing permission checks
+        elif not await Utils.check_permissions(interaction, ["administrator"]):
             return
         
         try:
@@ -385,12 +391,19 @@ class Lockdown(commands.Cog):
     async def lockdown_config(
         self,
         interaction: discord.Interaction,
-        setting: str,
+        setting: str = None,
         value: str = None
     ):
         """Configure lockdown settings"""
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["manage_channels"]):
+                return
+        
         # Check permissions
-        if not await Utils.check_permissions(interaction, ["administrator"]):
+        if is_superuser(interaction.user):
+            pass  # allow superuser bypass
+        #     # existing permission checks
+        elif not await Utils.check_permissions(interaction, ["administrator"]):
             return
         
         automod_settings = await self.bot.database.get_automod_settings(interaction.guild.id)

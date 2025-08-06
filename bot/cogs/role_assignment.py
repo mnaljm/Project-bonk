@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from typing import List
 
-from bot.utils.utils import Utils
+from bot.utils.utils import Utils, is_superuser
 
 
 class RoleAssignment(commands.Cog):
@@ -68,6 +68,9 @@ class RoleAssignment(commands.Cog):
     @app_commands.command(name="join_role", description="Join a Gooner role")
     @app_commands.describe(role="The Gooner role you want to join")
     async def join_role(self, interaction: discord.Interaction, role: str):
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["manage_roles"]):
+                return
         """Allow users to join a Gooner role"""
         # Convert role ID string to role object
         try:
@@ -151,6 +154,9 @@ class RoleAssignment(commands.Cog):
     @app_commands.command(name="leave_role", description="Leave a Gooner role")
     @app_commands.describe(role="The Gooner role you want to leave")
     async def leave_role(self, interaction: discord.Interaction, role: str):
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["manage_roles"]):
+                return
         """Allow users to leave a Gooner role"""
         # Convert role ID string to role object
         try:
@@ -225,6 +231,9 @@ class RoleAssignment(commands.Cog):
     @app_commands.command(name="toggle_role", description="Toggle a Gooner role (join if you don't have it, leave if you do)")
     @app_commands.describe(role="The Gooner role you want to toggle")
     async def toggle_role(self, interaction: discord.Interaction, role: str):
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["manage_roles"]):
+                return
         """Toggle a Gooner role - join if not present, leave if present"""
         # Convert role ID string to role object
         try:
@@ -316,6 +325,9 @@ class RoleAssignment(commands.Cog):
 
     @app_commands.command(name="join_all_roles", description="Join all available Gooner roles")
     async def join_all_roles(self, interaction: discord.Interaction):
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["manage_roles"]):
+                return
         """Allow users to join all available Gooner roles"""
         gooner_roles = self.get_gooner_roles(interaction.guild)
         
@@ -417,6 +429,9 @@ class RoleAssignment(commands.Cog):
 
     @app_commands.command(name="leave_all_roles", description="Leave all Gooner roles")
     async def leave_all_roles(self, interaction: discord.Interaction):
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["manage_roles"]):
+                return
         """Allow users to leave all Gooner roles"""
         gooner_roles = self.get_gooner_roles(interaction.guild)
         

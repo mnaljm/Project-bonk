@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from datetime import datetime, timedelta, timezone
 
-from bot.utils.utils import Utils
+from bot.utils.utils import Utils, is_superuser
 from bot.utils.logger import log_moderation_action
 
 
@@ -29,44 +29,43 @@ class Moderation(commands.Cog):
         delete_messages: int = 0
     ):
         """Ban a user from the server"""
-        # Check permissions
-        if not await Utils.check_permissions(interaction, ["ban_members"]):
-            return
-        
-        if not await Utils.check_bot_permissions(interaction, ["ban_members"]):
-            return
-        
-        # Check hierarchy
-        hierarchy_check, error_msg = Utils.check_hierarchy(interaction.user, user)
-        if not hierarchy_check:
-            await Utils.send_response(interaction, embed=Utils.create_error_embed(error_msg), ephemeral=True)
-            return
-        
-        bot_hierarchy_check, bot_error_msg = Utils.check_bot_hierarchy(interaction.guild.me, user)
-        if not bot_hierarchy_check:
-            await Utils.send_response(interaction, embed=Utils.create_error_embed(bot_error_msg), ephemeral=True)
-            return
-        
-        # Parse duration
-        duration_seconds = None
-        if duration:
-            duration_seconds = Utils.parse_duration(duration)
-            if duration_seconds is None:
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["ban_members"]):
+                return
+            if not await Utils.check_bot_permissions(interaction, ["ban_members"]):
+                return
+            
+            # Check hierarchy
+            hierarchy_check, error_msg = Utils.check_hierarchy(interaction.user, user)
+            if not hierarchy_check:
+                await Utils.send_response(interaction, embed=Utils.create_error_embed(error_msg), ephemeral=True)
+                return
+            
+            bot_hierarchy_check, bot_error_msg = Utils.check_bot_hierarchy(interaction.guild.me, user)
+            if not bot_hierarchy_check:
+                await Utils.send_response(interaction, embed=Utils.create_error_embed(bot_error_msg), ephemeral=True)
+                return
+            
+            # Parse duration
+            duration_seconds = None
+            if duration:
+                duration_seconds = Utils.parse_duration(duration)
+                if duration_seconds is None:
+                    await Utils.send_response(
+                        interaction,
+                        embed=Utils.create_error_embed("Invalid duration format. Use format like: 1h, 2d, 1w"),
+                        ephemeral=True
+                    )
+                    return
+            
+            # Validate delete_messages
+            if delete_messages < 0 or delete_messages > 7:
                 await Utils.send_response(
                     interaction,
-                    embed=Utils.create_error_embed("Invalid duration format. Use format like: 1h, 2d, 1w"),
+                    embed=Utils.create_error_embed("Delete messages must be between 0 and 7 days"),
                     ephemeral=True
                 )
                 return
-        
-        # Validate delete_messages
-        if delete_messages < 0 or delete_messages > 7:
-            await Utils.send_response(
-                interaction,
-                embed=Utils.create_error_embed("Delete messages must be between 0 and 7 days"),
-                ephemeral=True
-            )
-            return
         
         try:
             # Create moderation case
@@ -150,23 +149,22 @@ class Moderation(commands.Cog):
         reason: str = None
     ):
         """Kick a user from the server"""
-        # Check permissions
-        if not await Utils.check_permissions(interaction, ["kick_members"]):
-            return
-        
-        if not await Utils.check_bot_permissions(interaction, ["kick_members"]):
-            return
-        
-        # Check hierarchy
-        hierarchy_check, error_msg = Utils.check_hierarchy(interaction.user, user)
-        if not hierarchy_check:
-            await Utils.send_response(interaction, embed=Utils.create_error_embed(error_msg), ephemeral=True)
-            return
-        
-        bot_hierarchy_check, bot_error_msg = Utils.check_bot_hierarchy(interaction.guild.me, user)
-        if not bot_hierarchy_check:
-            await Utils.send_response(interaction, embed=Utils.create_error_embed(bot_error_msg), ephemeral=True)
-            return
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["kick_members"]):
+                return
+            if not await Utils.check_bot_permissions(interaction, ["kick_members"]):
+                return
+            
+            # Check hierarchy
+            hierarchy_check, error_msg = Utils.check_hierarchy(interaction.user, user)
+            if not hierarchy_check:
+                await Utils.send_response(interaction, embed=Utils.create_error_embed(error_msg), ephemeral=True)
+                return
+            
+            bot_hierarchy_check, bot_error_msg = Utils.check_bot_hierarchy(interaction.guild.me, user)
+            if not bot_hierarchy_check:
+                await Utils.send_response(interaction, embed=Utils.create_error_embed(bot_error_msg), ephemeral=True)
+                return
         
         try:
             # Create moderation case
@@ -233,42 +231,30 @@ class Moderation(commands.Cog):
         reason: str = None
     ):
         """Timeout a user"""
-        # Check permissions
-        if not await Utils.check_permissions(interaction, ["moderate_members"]):
-            return
-        
-        if not await Utils.check_bot_permissions(interaction, ["moderate_members"]):
-            return
-        
-        # Check hierarchy
-        hierarchy_check, error_msg = Utils.check_hierarchy(interaction.user, user)
-        if not hierarchy_check:
-            await Utils.send_response(interaction, embed=Utils.create_error_embed(error_msg), ephemeral=True)
-            return
-        
-        bot_hierarchy_check, bot_error_msg = Utils.check_bot_hierarchy(interaction.guild.me, user)
-        if not bot_hierarchy_check:
-            await Utils.send_response(interaction, embed=Utils.create_error_embed(bot_error_msg), ephemeral=True)
-            return
-        
-        # Parse duration
-        duration_seconds = Utils.parse_duration(duration)
-        if duration_seconds is None:
-            await Utils.send_response(
-                interaction,
-                embed=Utils.create_error_embed("Invalid duration format. Use format like: 10m, 1h, 2d"),
-                ephemeral=True
-            )
-            return
-        
-        # Check duration limits (Discord limit is 28 days)
-        if duration_seconds > 28 * 24 * 60 * 60:
-            await Utils.send_response(
-                interaction,
-                embed=Utils.create_error_embed("Timeout duration cannot exceed 28 days"),
-                ephemeral=True
-            )
-            return
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["moderate_members"]):
+                return
+            if not await Utils.check_bot_permissions(interaction, ["moderate_members"]):
+                return
+            
+            # Parse duration
+            duration_seconds = Utils.parse_duration(duration)
+            if duration_seconds is None:
+                await Utils.send_response(
+                    interaction,
+                    embed=Utils.create_error_embed("Invalid duration format. Use format like: 10m, 1h, 2d"),
+                    ephemeral=True
+                )
+                return
+            
+            # Check duration limits (Discord limit is 28 days)
+            if duration_seconds > 28 * 24 * 60 * 60:
+                await Utils.send_response(
+                    interaction,
+                    embed=Utils.create_error_embed("Timeout duration cannot exceed 28 days"),
+                    ephemeral=True
+                )
+                return
         
         try:
             # Create moderation case
@@ -333,21 +319,20 @@ class Moderation(commands.Cog):
         reason: str = None
     ):
         """Remove timeout from a user"""
-        # Check permissions
-        if not await Utils.check_permissions(interaction, ["moderate_members"]):
-            return
-        
-        if not await Utils.check_bot_permissions(interaction, ["moderate_members"]):
-            return
-        
-        # Check if user is timed out
-        if not user.is_timed_out():
-            await Utils.send_response(
-                interaction,
-                embed=Utils.create_error_embed("This user is not timed out"),
-                ephemeral=True
-            )
-            return
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["moderate_members"]):
+                return
+            if not await Utils.check_bot_permissions(interaction, ["moderate_members"]):
+                return
+            
+            # Check if user is timed out
+            if not user.is_timed_out():
+                await Utils.send_response(
+                    interaction,
+                    embed=Utils.create_error_embed("This user is not timed out"),
+                    ephemeral=True
+                )
+                return
         
         try:
             # Remove timeout
@@ -385,9 +370,9 @@ class Moderation(commands.Cog):
         reason: str
     ):
         """Warn a user"""
-        # Check permissions
-        if not await Utils.check_permissions(interaction, ["kick_members"]):
-            return
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["kick_members"]):
+                return
         
         try:
             # Add warning to database
@@ -464,9 +449,9 @@ class Moderation(commands.Cog):
         user: discord.Member
     ):
         """View warnings for a user"""
-        # Check permissions
-        if not await Utils.check_permissions(interaction, ["kick_members"]):
-            return
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["kick_members"]):
+                return
         
         try:
             # Get warnings from database
@@ -537,21 +522,20 @@ class Moderation(commands.Cog):
         reason: str = None
     ):
         """Delete multiple messages"""
-        # Check permissions
-        if not await Utils.check_permissions(interaction, ["manage_messages"]):
-            return
-        
-        if not await Utils.check_bot_permissions(interaction, ["manage_messages"]):
-            return
-        
-        # Validate amount
-        if amount < 1 or amount > 100:
-            await Utils.send_response(
-                interaction,
-                embed=Utils.create_error_embed("Amount must be between 1 and 100"),
-                ephemeral=True
-            )
-            return
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["manage_messages"]):
+                return
+            if not await Utils.check_bot_permissions(interaction, ["manage_messages"]):
+                return
+            
+            # Validate amount
+            if amount < 1 or amount > 100:
+                await Utils.send_response(
+                    interaction,
+                    embed=Utils.create_error_embed("Amount must be between 1 and 100"),
+                    ephemeral=True
+                )
+                return
         
         try:
             # Defer the response as this might take a while
@@ -602,9 +586,9 @@ class Moderation(commands.Cog):
         reason: str = "No reason provided"
     ):
         """Clear all warnings for a user"""
-        # Check permissions
-        if not await Utils.check_permissions(interaction, ["kick_members"]):
-            return
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["kick_members"]):
+                return
         
         try:
             # Get current warning count
@@ -678,9 +662,9 @@ class Moderation(commands.Cog):
         reason: str = "No reason provided"
     ):
         """Remove a specific warning by ID"""
-        # Check permissions
-        if not await Utils.check_permissions(interaction, ["kick_members"]):
-            return
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["kick_members"]):
+                return
         
         try:
             # Get the warning to check if it exists and belongs to this guild
@@ -750,9 +734,13 @@ class Moderation(commands.Cog):
     @app_commands.describe(case_id="The case ID to look up")
     async def case_lookup(self, interaction: discord.Interaction, case_id: int):
         """Look up a specific moderation case"""
-        # Check permissions
-        if not await Utils.check_permissions(interaction, ["moderate_members"]):
-            return
+        # Superuser bypass
+        if is_superuser(interaction.user):
+            pass  # allow
+        else:
+            # Check permissions
+            if not await Utils.check_permissions(interaction, ["moderate_members"]):
+                return
         
         try:
             case = await self.bot.database.get_moderation_case(case_id)
@@ -818,9 +806,13 @@ class Moderation(commands.Cog):
         limit: int = 10
     ):
         """View moderation history for a user"""
-        # Check permissions
-        if not await Utils.check_permissions(interaction, ["moderate_members"]):
-            return
+        # Superuser bypass
+        if is_superuser(interaction.user):
+            pass  # allow
+        else:
+            # Check permissions
+            if not await Utils.check_permissions(interaction, ["moderate_members"]):
+                return
         
         # Validate limit
         if limit < 1 or limit > 25:
@@ -895,9 +887,13 @@ class Moderation(commands.Cog):
     @app_commands.describe(limit="Number of recent cases to show (default: 10, max: 20)")
     async def recent_cases(self, interaction: discord.Interaction, limit: int = 10):
         """View recent moderation actions in the server"""
-        # Check permissions
-        if not await Utils.check_permissions(interaction, ["moderate_members"]):
-            return
+        # Superuser bypass
+        if is_superuser(interaction.user):
+            pass  # allow
+        else:
+            # Check permissions
+            if not await Utils.check_permissions(interaction, ["moderate_members"]):
+                return
         
         # Validate limit
         if limit < 1 or limit > 20:

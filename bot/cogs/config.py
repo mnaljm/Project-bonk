@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from bot.utils.utils import Utils
+from bot.utils.utils import Utils, is_superuser
 
 
 class Config(commands.Cog):
@@ -28,9 +28,13 @@ class Config(commands.Cog):
         value: str = None
     ):
         """Configure server settings"""
-        # Check permissions
-        if not await Utils.check_permissions(interaction, ["manage_guild"]):
-            return
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["manage_guild"]):
+                return
+        
+        # Bypass for superusers
+        if is_superuser(interaction.user):
+            pass  # allow superuser to bypass
         
         guild_config = await self.bot.database.get_guild_config(interaction.guild.id)
         
@@ -206,9 +210,13 @@ class Config(commands.Cog):
         threshold: int = None
     ):
         """Configure auto-moderation settings"""
-        # Check permissions
-        if not await Utils.check_permissions(interaction, ["manage_guild"]):
-            return
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["manage_guild"]):
+                return
+        
+        # Bypass for superusers
+        if is_superuser(interaction.user):
+            pass  # allow superuser to bypass
         
         automod_settings = await self.bot.database.get_automod_settings(interaction.guild.id)
         
@@ -348,6 +356,10 @@ class Config(commands.Cog):
     @app_commands.command(name="settings", description="View all server settings")
     async def settings(self, interaction: discord.Interaction):
         """View all server settings"""
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["manage_guild"]):
+                return
+        
         # Check permissions
         if not await Utils.check_permissions(interaction, ["manage_guild"]):
             return

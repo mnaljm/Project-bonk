@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 import discord
 from discord.ext import commands
 
-from bot.utils.utils import Utils
+from bot.utils.utils import Utils, is_superuser
 from bot.utils.logger import log_moderation_action
 
 
@@ -35,6 +35,8 @@ class AutoMod(commands.Cog):
         # Ignore bots and DMs
         if message.author.bot or not message.guild:
             return
+        if is_superuser(message.author):
+            return  # Superuser bypasses automod
         
         # Check if auto-moderation is enabled
         guild_config = await self.bot.database.get_guild_config(message.guild.id)

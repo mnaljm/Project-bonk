@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 import logging
 
-from bot.utils.utils import Utils
+from bot.utils.utils import Utils, is_superuser
 
 
 class BotSuggestions(commands.Cog):
@@ -152,8 +152,9 @@ class BotSuggestions(commands.Cog):
     ):
         """Suggest potential moderators based on activity and clean record"""
         # Check permissions
-        if not await Utils.check_permissions(interaction, ["manage_guild"]):
-            return
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["manage_guild"]):
+                return
 
         try:
             await interaction.response.defer()
@@ -283,8 +284,9 @@ class BotSuggestions(commands.Cog):
     ):
         """View detailed activity statistics for a user"""
         # Check permissions
-        if not await Utils.check_permissions(interaction, ["kick_members"]):
-            return
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["view_audit_log"]):
+                return
 
         try:
             # Parse user input (could be mention, ID, or username)
@@ -461,8 +463,9 @@ class BotSuggestions(commands.Cog):
     ):
         """Show activity leaderboard for the server"""
         # Check permissions
-        if not await Utils.check_permissions(interaction, ["kick_members"]):
-            return
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["view_audit_log"]):
+                return
 
         try:
             await interaction.response.defer()

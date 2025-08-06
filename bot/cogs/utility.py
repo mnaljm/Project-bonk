@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
 
-from bot.utils.utils import Utils
+from bot.utils.utils import Utils, is_superuser
 
 
 class Utility(commands.Cog):
@@ -15,6 +15,9 @@ class Utility(commands.Cog):
     @app_commands.command(name="ping", description="Check the bot's latency")
     async def ping(self, interaction: discord.Interaction):
         """Check the bot's latency"""
+        if not is_superuser(interaction.user):
+            pass  # No permission required for ping
+        
         embed = Utils.create_info_embed(
             f"🏓 Pong! Latency: {round(self.bot.latency * 1000)}ms",
             "Bot Latency"
@@ -25,68 +28,78 @@ class Utility(commands.Cog):
     @app_commands.describe(user="The user to get information about")
     async def userinfo(self, interaction: discord.Interaction, user: discord.Member = None):
         """Get information about a user"""
+        if not is_superuser(interaction.user):
+            pass  # No permission required for userinfo
+        
         if user is None:
             user = interaction.user
         
-        # Get user data
-        created_at = Utils.format_timestamp(user.created_at)
-        joined_at = Utils.format_timestamp(user.joined_at) if user.joined_at else "Unknown"
-        
-        # Get roles (excluding @everyone)
-        roles = [role.mention for role in user.roles[1:]]
-        roles_text = ", ".join(roles) if roles else "None"
-        
-        # Get permissions
-        key_permissions = []
-        if user.guild_permissions.administrator:
-            key_permissions.append("Administrator")
+        # Superuser bypass
+        if is_superuser(interaction.user):
+            pass  # allow
         else:
-            perms = [
-                ("Manage Server", user.guild_permissions.manage_guild),
-                ("Manage Channels", user.guild_permissions.manage_channels),
-                ("Manage Messages", user.guild_permissions.manage_messages),
-                ("Kick Members", user.guild_permissions.kick_members),
-                ("Ban Members", user.guild_permissions.ban_members),
-                ("Moderate Members", user.guild_permissions.moderate_members),
-            ]
-            key_permissions = [name for name, has_perm in perms if has_perm]
-        
-        permissions_text = ", ".join(key_permissions) if key_permissions else "None"
-        
-        # Create embed
-        embed = Utils.create_embed(
-            title=f"User Info - {user.display_name}",
-            color=user.color if user.color != discord.Color.default() else discord.Color.blue(),
-            thumbnail=user.display_avatar.url,
-            fields=[
-                {"name": "Username", "value": str(user), "inline": True},
-                {"name": "User ID", "value": str(user.id), "inline": True},
-                {"name": "Nickname", "value": user.display_name, "inline": True},
-                {"name": "Account Created", "value": created_at, "inline": True},
-                {"name": "Joined Server", "value": joined_at, "inline": True},
-                {"name": "Status", "value": str(user.status).title(), "inline": True},
-                {"name": f"Roles ({len(roles)})", "value": Utils.truncate_text(roles_text, 1024), "inline": False},
-                {"name": "Key Permissions", "value": permissions_text, "inline": False},
-            ]
-        )
-        
-        # Add bot badge if user is a bot
-        if user.bot:
-            embed.add_field(name="Bot", value="✅ Yes", inline=True)
-        
-        # Add timeout info if user is timed out
-        if hasattr(user, 'is_timed_out') and user.is_timed_out():
-            embed.add_field(
-                name="Timed Out Until",
-                value=Utils.format_timestamp(user.timed_out_until),
-                inline=True
+            # Get user data
+            created_at = Utils.format_timestamp(user.created_at)
+            joined_at = Utils.format_timestamp(user.joined_at) if user.joined_at else "Unknown"
+            
+            # Get roles (excluding @everyone)
+            roles = [role.mention for role in user.roles[1:]]
+            roles_text = ", ".join(roles) if roles else "None"
+            
+            # Get permissions
+            key_permissions = []
+            if user.guild_permissions.administrator:
+                key_permissions.append("Administrator")
+            else:
+                perms = [
+                    ("Manage Server", user.guild_permissions.manage_guild),
+                    ("Manage Channels", user.guild_permissions.manage_channels),
+                    ("Manage Messages", user.guild_permissions.manage_messages),
+                    ("Kick Members", user.guild_permissions.kick_members),
+                    ("Ban Members", user.guild_permissions.ban_members),
+                    ("Moderate Members", user.guild_permissions.moderate_members),
+                ]
+                key_permissions = [name for name, has_perm in perms if has_perm]
+            
+            permissions_text = ", ".join(key_permissions) if key_permissions else "None"
+            
+            # Create embed
+            embed = Utils.create_embed(
+                title=f"User Info - {user.display_name}",
+                color=user.color if user.color != discord.Color.default() else discord.Color.blue(),
+                thumbnail=user.display_avatar.url,
+                fields=[
+                    {"name": "Username", "value": str(user), "inline": True},
+                    {"name": "User ID", "value": str(user.id), "inline": True},
+                    {"name": "Nickname", "value": user.display_name, "inline": True},
+                    {"name": "Account Created", "value": created_at, "inline": True},
+                    {"name": "Joined Server", "value": joined_at, "inline": True},
+                    {"name": "Status", "value": str(user.status).title(), "inline": True},
+                    {"name": f"Roles ({len(roles)})", "value": Utils.truncate_text(roles_text, 1024), "inline": False},
+                    {"name": "Key Permissions", "value": permissions_text, "inline": False},
+                ]
             )
+            
+            # Add bot badge if user is a bot
+            if user.bot:
+                embed.add_field(name="Bot", value="✅ Yes", inline=True)
+            
+            # Add timeout info if user is timed out
+            if hasattr(user, 'is_timed_out') and user.is_timed_out():
+                embed.add_field(
+                    name="Timed Out Until",
+                    value=Utils.format_timestamp(user.timed_out_until),
+                    inline=True
+                )
         
         await Utils.send_response(interaction, embed=embed)
     
     @app_commands.command(name="serverinfo", description="Get information about the server")
     async def serverinfo(self, interaction: discord.Interaction):
         """Get information about the server"""
+        if not is_superuser(interaction.user):
+            pass  # No permission required for serverinfo
+        
         guild = interaction.guild
         
         # Get server data
@@ -152,6 +165,9 @@ class Utility(commands.Cog):
     @app_commands.describe(user="The user to get the avatar of")
     async def avatar(self, interaction: discord.Interaction, user: discord.Member = None):
         """Get a user's avatar"""
+        if not is_superuser(interaction.user):
+            pass  # No permission required for avatar
+        
         if user is None:
             user = interaction.user
         
@@ -174,6 +190,9 @@ class Utility(commands.Cog):
     @app_commands.describe(role="The role to get information about")
     async def roleinfo(self, interaction: discord.Interaction, role: discord.Role):
         """Get information about a role"""
+        if not is_superuser(interaction.user):
+            pass  # No permission required for roleinfo
+        
         # Get role data
         created_at = Utils.format_timestamp(role.created_at)
         members_with_role = len(role.members)
@@ -219,6 +238,9 @@ class Utility(commands.Cog):
     @app_commands.describe(channel="The channel to get information about")
     async def channelinfo(self, interaction: discord.Interaction, channel: discord.TextChannel = None):
         """Get information about a channel"""
+        if not is_superuser(interaction.user):
+            pass  # No permission required for channelinfo
+        
         if channel is None:
             channel = interaction.channel
         
@@ -261,6 +283,9 @@ class Utility(commands.Cog):
     @app_commands.command(name="help", description="Show help information")
     async def help(self, interaction: discord.Interaction):
         """Show help information"""
+        if not is_superuser(interaction.user):
+            pass  # No permission required for help
+        
         embed = Utils.create_embed(
             title="🤖 Project Bonk - Help",
             description="Here are all the available commands:",

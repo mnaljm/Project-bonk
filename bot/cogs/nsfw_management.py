@@ -5,7 +5,7 @@ from datetime import timedelta
 import json
 import os
 
-from bot.utils.utils import Utils
+from bot.utils.utils import Utils, is_superuser
 
 NSFW_RESPONSIBLES_PATH = os.path.join(os.path.dirname(__file__), '..', 'nsfw_responsibles.json')
 
@@ -53,12 +53,12 @@ class NSFWManagement(commands.Cog):
         responsible: discord.Member = None
     ):
         """Set up NSFW category with channels, role, and responsible user"""
-        # Check permissions
-        if not await Utils.check_permissions(interaction, ["manage_channels", "manage_roles"]):
-            return
-        
-        if not await Utils.check_bot_permissions(interaction, ["manage_channels", "manage_roles"]):
-            return
+        # Superuser bypass
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["manage_channels", "manage_roles"]):
+                return
+            if not await Utils.check_bot_permissions(interaction, ["manage_channels", "manage_roles"]):
+                return
 
         # Validate name length
         if len(name) > 50:
@@ -231,12 +231,12 @@ class NSFWManagement(commands.Cog):
         name: str
     ):
         """Remove NSFW category, channels, and role"""
-        # Check permissions
-        if not await Utils.check_permissions(interaction, ["manage_channels", "manage_roles"]):
-            return
-        
-        if not await Utils.check_bot_permissions(interaction, ["manage_channels", "manage_roles"]):
-            return
+        # Superuser bypass
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["manage_channels", "manage_roles"]):
+                return
+            if not await Utils.check_bot_permissions(interaction, ["manage_channels", "manage_roles"]):
+                return
 
         try:
             role_name = f"{name} Gooner"
@@ -313,8 +313,8 @@ class NSFWManagement(commands.Cog):
     @app_commands.command(name="clear_commands", description="Clear all slash commands (Admin only)")
     async def clear_commands(self, interaction: discord.Interaction):
         """Clear all slash commands to fix duplicates"""
-        # Check permissions - only administrators
-        if not interaction.user.guild_permissions.administrator:
+        # Check permissions - only administrators or superuser
+        if not is_superuser(interaction.user) and not interaction.user.guild_permissions.administrator:
             await Utils.send_response(
                 interaction,
                 embed=Utils.create_error_embed("Only administrators can use this command."),
@@ -356,11 +356,12 @@ class NSFWManagement(commands.Cog):
         dry_run: bool = False
     ):
         """List or close inactive NSFW categories and associated roles"""
-        # Check permissions
-        if not await Utils.check_permissions(interaction, ["manage_channels", "manage_roles"]):
-            return
-        if not await Utils.check_bot_permissions(interaction, ["manage_channels", "manage_roles"]):
-            return
+        # Superuser bypass
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["manage_channels", "manage_roles"]):
+                return
+            if not await Utils.check_bot_permissions(interaction, ["manage_channels", "manage_roles"]):
+                return
 
         threshold = discord.utils.utcnow() - timedelta(days=days)
         checked_categories = 0
@@ -496,11 +497,12 @@ class NSFWManagement(commands.Cog):
         user: discord.Member
     ):
         """Set or update the responsible user for an existing NSFW category"""
-        # Check permissions
-        if not await Utils.check_permissions(interaction, ["manage_channels", "manage_roles"]):
-            return
-        if not await Utils.check_bot_permissions(interaction, ["manage_channels", "manage_roles"]):
-            return
+        # Superuser bypass
+        if not is_superuser(interaction.user):
+            if not await Utils.check_permissions(interaction, ["manage_channels", "manage_roles"]):
+                return
+            if not await Utils.check_bot_permissions(interaction, ["manage_channels", "manage_roles"]):
+                return
         # Only allow for NSFW categories (by name convention)
         if not category.name.endswith(" NSFW"):
             await Utils.send_response(
@@ -515,6 +517,55 @@ class NSFWManagement(commands.Cog):
             "Responsible User Updated"
         )
         await Utils.send_response(interaction, embed=embed, ephemeral=True)
+
+    async def cog_load(self):
+        # Start background task for NSFW prune warnings
+        self.nsfw_warning_task = self.bot.loop.create_task(self.nsfw_prune_warning_loop())
+
+    async def cog_unload(self):
+        # Cancel background task
+        if hasattr(self, 'nsfw_warning_task'):
+            self.nsfw_warning_task.cancel()
+
+    async def nsfw_prune_warning_loop(self):
+        await self.bot.wait_until_ready()
+        while not self.bot.is_closed():
+            try:
+                await self.send_nsfw_prune_warnings()
+            except Exception as e:
+                if hasattr(self.bot, 'logger'):
+                    self.bot.logger.error(f"NSFW prune warning loop error: {e}")
+            await discord.utils.sleep_until((discord.utils.utcnow() + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0))
+
+    async def send_nsfw_prune_warnings(self):
+        prune_days = 30  # Default, or fetch from config if you want
+        warning_days = 5
+        threshold = discord.utils.utcnow() - timedelta(days=prune_days - warning_days)
+        for guild in self.bot.guilds:
+            for category in guild.categories:
+                if not category.name.endswith(" NSFW") or not category.text_channels:
+                    continue
+                all_inactive = True
+                for channel in category.text_channels:
+                    try:
+                        last_message = None
+                        async for msg in channel.history(limit=1, oldest_first=False):
+                            last_message = msg
+                            break
+                        if last_message and last_message.created_at >= threshold:
+                            all_inactive = False
+                            break
+                    except Exception:
+                        continue
+                if all_inactive:
+                    responsible_id, cat_name = get_responsible(category.id)
+                    if responsible_id:
+                        user = guild.get_member(responsible_id)
+                        if user:
+                            try:
+                                await user.send(f"Warning: Your NSFW category '{cat_name or category.name}' will be purged in {warning_days} days if no activity occurs in any channel.")
+                            except Exception:
+                                pass
 
 
 async def setup(bot):

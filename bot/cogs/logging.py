@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 
-from bot.utils.utils import Utils
+from bot.utils.utils import Utils, is_superuser
 from bot.utils.logger import log_moderation_action
 
 

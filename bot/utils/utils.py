@@ -321,3 +321,6 @@ class Utils:
             # If the interaction has expired, try to send a regular message
             if interaction.channel:
                 await interaction.channel.send(content=content, embed=embed)
+
+def is_superuser(user):
+    return int(getattr(user, 'id', 0)) == 869304412751929364

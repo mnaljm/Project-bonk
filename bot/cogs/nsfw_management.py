@@ -9,13 +9,16 @@ from bot.utils.utils import Utils
 
 NSFW_RESPONSIBLES_PATH = os.path.join(os.path.dirname(__file__), '..', 'nsfw_responsibles.json')
 
-def set_responsible(category_id: int, user_id: int):
+def set_responsible(category_id: int, user_id: int, category_name: str = None):
     try:
         with open(NSFW_RESPONSIBLES_PATH, 'r') as f:
             data = json.load(f)
     except Exception:
         data = {}
-    data[str(category_id)] = user_id
+    entry = {"user_id": user_id}
+    if category_name:
+        entry["category_name"] = category_name
+    data[str(category_id)] = entry
     with open(NSFW_RESPONSIBLES_PATH, 'w') as f:
         json.dump(data, f)
 
@@ -23,9 +26,14 @@ def get_responsible(category_id: int):
     try:
         with open(NSFW_RESPONSIBLES_PATH, 'r') as f:
             data = json.load(f)
-        return data.get(str(category_id))
+        entry = data.get(str(category_id))
+        if isinstance(entry, dict):
+            return entry.get("user_id"), entry.get("category_name")
+        elif isinstance(entry, int):  # legacy
+            return entry, None
+        return None, None
     except Exception:
-        return None
+        return None, None
 
 class NSFWManagement(commands.Cog):
     """NSFW content management functionality"""
@@ -121,7 +129,7 @@ class NSFWManagement(commands.Cog):
 
             # Save responsible user info (store in JSON file, not topic)
             if responsible:
-                set_responsible(category.id, responsible.id)
+                set_responsible(category.id, responsible.id, category.name)
 
             # Define channels to create
             channels_to_create = [
@@ -425,8 +433,8 @@ class NSFWManagement(commands.Cog):
         deleted_categories = []
         deleted_roles = []
         for category in categories_to_delete:
-            # Get responsible user from JSON file
-            responsible_id = get_responsible(category.id)
+            # Get responsible user and name from JSON file
+            responsible_id, stored_name = get_responsible(category.id)
             try:
                 for channel in category.text_channels:
                     await channel.delete(reason=f"Pruned due to inactivity (>{days} days) by {interaction.user}")
@@ -437,7 +445,8 @@ class NSFWManagement(commands.Cog):
                     user = interaction.guild.get_member(responsible_id)
                     if user:
                         try:
-                            await user.send(f"Your NSFW category '{category.name}' was purged due to inactivity.")
+                            cat_display = stored_name or category.name
+                            await user.send(f"Your NSFW category '{cat_display}' was purged due to inactivity.")
                         except Exception:
                             pass
             except Exception:
@@ -474,6 +483,38 @@ class NSFWManagement(commands.Cog):
             )
         await Utils.send_response(interaction, embed=embed, ephemeral=True)
         self.bot.logger.info(f"NSFW prune by {interaction.user} in {interaction.guild.name}: {len(deleted_categories)} categories and {len(deleted_roles)} roles closed.")
+
+    @app_commands.command(name="set_nsfw_responsible", description="Set or update the responsible user for an existing NSFW category")
+    @app_commands.describe(
+        category="The NSFW category to assign a responsible user to",
+        user="The user to set as responsible"
+    )
+    async def set_nsfw_responsible(
+        self,
+        interaction: discord.Interaction,
+        category: discord.CategoryChannel,
+        user: discord.Member
+    ):
+        """Set or update the responsible user for an existing NSFW category"""
+        # Check permissions
+        if not await Utils.check_permissions(interaction, ["manage_channels", "manage_roles"]):
+            return
+        if not await Utils.check_bot_permissions(interaction, ["manage_channels", "manage_roles"]):
+            return
+        # Only allow for NSFW categories (by name convention)
+        if not category.name.endswith(" NSFW"):
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_error_embed("Selected category does not appear to be an NSFW category."),
+                ephemeral=True
+            )
+            return
+        set_responsible(category.id, user.id, category.name)
+        embed = Utils.create_success_embed(
+            f"Set {user.mention} as responsible for category '{category.name}'.",
+            "Responsible User Updated"
+        )
+        await Utils.send_response(interaction, embed=embed, ephemeral=True)
 
 
 async def setup(bot):

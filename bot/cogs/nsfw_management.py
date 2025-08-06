@@ -1,6 +1,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
+from datetime import timedelta
 
 from bot.utils.utils import Utils
 
@@ -319,7 +320,7 @@ class NSFWManagement(commands.Cog):
         if not await Utils.check_bot_permissions(interaction, ["manage_channels", "manage_roles"]):
             return
 
-        threshold = discord.utils.utcnow() - discord.timedelta(days=days)
+        threshold = discord.utils.utcnow() - timedelta(days=days)
         closed_channels = []
         checked_channels = 0
         roles_to_delete = set()

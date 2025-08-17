@@ -68,9 +68,6 @@ class RoleAssignment(commands.Cog):
     @app_commands.command(name="join_role", description="Join a Gooner role")
     @app_commands.describe(role="The Gooner role you want to join")
     async def join_role(self, interaction: discord.Interaction, role: str):
-        if not is_superuser(interaction.user):
-            if not await Utils.check_permissions(interaction, ["manage_roles"]):
-                return
         """Allow users to join a Gooner role"""
         # Convert role ID string to role object
         try:

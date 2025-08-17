@@ -132,3 +132,4 @@ Thumbs.db
 # Bot specific
 config.json
 *.backup
+bot/nsfw_responsibles.json

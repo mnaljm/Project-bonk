@@ -424,9 +424,6 @@ class RoleAssignment(commands.Cog):
 
     @app_commands.command(name="leave_all_roles", description="Leave all Gooner roles")
     async def leave_all_roles(self, interaction: discord.Interaction):
-        if not is_superuser(interaction.user):
-            if not await Utils.check_permissions(interaction, ["manage_roles"]):
-                return
         """Allow users to leave all Gooner roles"""
         gooner_roles = self.get_gooner_roles(interaction.guild)
         

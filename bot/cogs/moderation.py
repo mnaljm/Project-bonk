@@ -29,6 +29,9 @@ class Moderation(commands.Cog):
         delete_messages: int = 0
     ):
         """Ban a user from the server"""
+        # Initialize duration_seconds to avoid UnboundLocalError
+        duration_seconds = None
+        
         if not is_superuser(interaction.user):
             if not await Utils.check_permissions(interaction, ["ban_members"]):
                 return

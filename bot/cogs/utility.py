@@ -34,63 +34,59 @@ class Utility(commands.Cog):
         if user is None:
             user = interaction.user
         
-        # Superuser bypass
-        if is_superuser(interaction.user):
-            pass  # allow
+        # Get user data
+        created_at = Utils.format_timestamp(user.created_at)
+        joined_at = Utils.format_timestamp(user.joined_at) if user.joined_at else "Unknown"
+        
+        # Get roles (excluding @everyone)
+        roles = [role.mention for role in user.roles[1:]]
+        roles_text = ", ".join(roles) if roles else "None"
+        
+        # Get permissions
+        key_permissions = []
+        if user.guild_permissions.administrator:
+            key_permissions.append("Administrator")
         else:
-            # Get user data
-            created_at = Utils.format_timestamp(user.created_at)
-            joined_at = Utils.format_timestamp(user.joined_at) if user.joined_at else "Unknown"
-            
-            # Get roles (excluding @everyone)
-            roles = [role.mention for role in user.roles[1:]]
-            roles_text = ", ".join(roles) if roles else "None"
-            
-            # Get permissions
-            key_permissions = []
-            if user.guild_permissions.administrator:
-                key_permissions.append("Administrator")
-            else:
-                perms = [
-                    ("Manage Server", user.guild_permissions.manage_guild),
-                    ("Manage Channels", user.guild_permissions.manage_channels),
-                    ("Manage Messages", user.guild_permissions.manage_messages),
-                    ("Kick Members", user.guild_permissions.kick_members),
-                    ("Ban Members", user.guild_permissions.ban_members),
-                    ("Moderate Members", user.guild_permissions.moderate_members),
-                ]
-                key_permissions = [name for name, has_perm in perms if has_perm]
-            
-            permissions_text = ", ".join(key_permissions) if key_permissions else "None"
-            
-            # Create embed
-            embed = Utils.create_embed(
-                title=f"User Info - {user.display_name}",
-                color=user.color if user.color != discord.Color.default() else discord.Color.blue(),
-                thumbnail=user.display_avatar.url,
-                fields=[
-                    {"name": "Username", "value": str(user), "inline": True},
-                    {"name": "User ID", "value": str(user.id), "inline": True},
-                    {"name": "Nickname", "value": user.display_name, "inline": True},
-                    {"name": "Account Created", "value": created_at, "inline": True},
-                    {"name": "Joined Server", "value": joined_at, "inline": True},
-                    {"name": "Status", "value": str(user.status).title(), "inline": True},
-                    {"name": f"Roles ({len(roles)})", "value": Utils.truncate_text(roles_text, 1024), "inline": False},
-                    {"name": "Key Permissions", "value": permissions_text, "inline": False},
-                ]
+            perms = [
+                ("Manage Server", user.guild_permissions.manage_guild),
+                ("Manage Channels", user.guild_permissions.manage_channels),
+                ("Manage Messages", user.guild_permissions.manage_messages),
+                ("Kick Members", user.guild_permissions.kick_members),
+                ("Ban Members", user.guild_permissions.ban_members),
+                ("Moderate Members", user.guild_permissions.moderate_members),
+            ]
+            key_permissions = [name for name, has_perm in perms if has_perm]
+        
+        permissions_text = ", ".join(key_permissions) if key_permissions else "None"
+        
+        # Create embed
+        embed = Utils.create_embed(
+            title=f"User Info - {user.display_name}",
+            color=user.color if user.color != discord.Color.default() else discord.Color.blue(),
+            thumbnail=user.display_avatar.url,
+            fields=[
+                {"name": "Username", "value": str(user), "inline": True},
+                {"name": "User ID", "value": str(user.id), "inline": True},
+                {"name": "Nickname", "value": user.display_name, "inline": True},
+                {"name": "Account Created", "value": created_at, "inline": True},
+                {"name": "Joined Server", "value": joined_at, "inline": True},
+                {"name": "Status", "value": str(user.status).title(), "inline": True},
+                {"name": f"Roles ({len(roles)})", "value": Utils.truncate_text(roles_text, 1024), "inline": False},
+                {"name": "Key Permissions", "value": permissions_text, "inline": False},
+            ]
+        )
+        
+        # Add bot badge if user is a bot
+        if user.bot:
+            embed.add_field(name="Bot", value="✅ Yes", inline=True)
+        
+        # Add timeout info if user is timed out
+        if hasattr(user, 'is_timed_out') and user.is_timed_out():
+            embed.add_field(
+                name="Timed Out Until",
+                value=Utils.format_timestamp(user.timed_out_until),
+                inline=True
             )
-            
-            # Add bot badge if user is a bot
-            if user.bot:
-                embed.add_field(name="Bot", value="✅ Yes", inline=True)
-            
-            # Add timeout info if user is timed out
-            if hasattr(user, 'is_timed_out') and user.is_timed_out():
-                embed.add_field(
-                    name="Timed Out Until",
-                    value=Utils.format_timestamp(user.timed_out_until),
-                    inline=True
-                )
         
         await Utils.send_response(interaction, embed=embed)
     

@@ -53,6 +53,9 @@ class NSFWManagement(commands.Cog):
         responsible: discord.Member = None
     ):
         """Set up NSFW category with channels, role, and responsible user"""
+        # Defer the response as this will take a while to create all channels
+        await interaction.response.defer()
+        
         # Superuser bypass
         if not is_superuser(interaction.user):
             if not await Utils.check_permissions(interaction, ["manage_channels", "manage_roles"]):
@@ -231,6 +234,9 @@ class NSFWManagement(commands.Cog):
         name: str
     ):
         """Remove NSFW category, channels, and role"""
+        # Defer the response as this will take a while to delete all channels
+        await interaction.response.defer()
+        
         # Superuser bypass
         if not is_superuser(interaction.user):
             if not await Utils.check_permissions(interaction, ["manage_channels", "manage_roles"]):
@@ -356,6 +362,9 @@ class NSFWManagement(commands.Cog):
         dry_run: bool = False
     ):
         """List or close inactive NSFW categories and associated roles"""
+        # Defer the response as this might take a while to check message history
+        await interaction.response.defer(ephemeral=True)
+        
         # Superuser bypass
         if not is_superuser(interaction.user):
             if not await Utils.check_permissions(interaction, ["manage_channels", "manage_roles"]):

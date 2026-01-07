@@ -373,6 +373,9 @@ class RoleAssignment(commands.Cog):
             )
             return
 
+        # Defer the response as adding multiple roles might take time
+        await interaction.response.defer(ephemeral=True)
+
         try:
             # Add all manageable roles to the user
             await interaction.user.add_roles(*manageable_roles, reason=f"Self-assigned all Gooner roles")
@@ -452,6 +455,9 @@ class RoleAssignment(commands.Cog):
                 ephemeral=True
             )
             return
+
+        # Defer the response as removing multiple roles might take time
+        await interaction.response.defer(ephemeral=True)
 
         try:
             # Remove all Gooner roles from the user

@@ -145,7 +145,8 @@ class MediaPuller(commands.Cog):
                     
         except Exception as e:
             self.logger.error(f"Error processing {url}: {e}")
-            await interaction.followup.send(f"An error occurred: {str(e)}")
+            error_msg = f"An error occurred: {str(e)}"
+            await interaction.followup.send(error_msg[:1990] + "..." if len(error_msg) > 1990 else error_msg)
 
     async def _do_scrape(self, page, base_url: str) -> tuple[List[str], List[dict], str]:
         self.logger.info(f"Navigating to {base_url}")

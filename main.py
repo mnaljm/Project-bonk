@@ -67,6 +67,7 @@ class BonkBot(commands.Bot):
             "bot.cogs.suggestions",
             "bot.cogs.nsfw_management",
             "bot.cogs.role_assignment",
+            "bot.cogs.simpcity",
         ]
         
         for extension in extensions:

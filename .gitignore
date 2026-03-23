@@ -108,6 +108,7 @@ dmypy.json
 *.db
 *.db-journal
 data/
+playwright_data/
 
 # Logs
 logs/
@@ -134,3 +135,4 @@ config.json
 *.backup
 bot/nsfw_responsibles.json
 bot/nsfw_responsibles.json
+data/simpcity_history.json

@@ -58,6 +58,8 @@ class MediaPuller(commands.Cog):
                         
                     normalized_urls = []
                     for m in all_media_urls:
+                        if m.split("?")[0].lower().endswith(".ico"):
+                            continue
                         if m.startswith("/"):
                             if "simpcity" in url_lower: m = "https://simpcity.cr" + m
                             elif "socialmediagirls" in url_lower: m = "https://socialmediagirls.com" + m

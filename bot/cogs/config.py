@@ -360,10 +360,6 @@ class Config(commands.Cog):
             if not await Utils.check_permissions(interaction, ["manage_guild"]):
                 return
         
-        # Check permissions
-        if not await Utils.check_permissions(interaction, ["manage_guild"]):
-            return
-        
         try:
             guild_config = await self.bot.database.get_guild_config(interaction.guild.id)
             automod_settings = await self.bot.database.get_automod_settings(interaction.guild.id)

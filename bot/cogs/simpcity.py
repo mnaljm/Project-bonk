@@ -160,7 +160,10 @@ class MediaPuller(commands.Cog):
         password = self.simpcity_password if is_simpcity else self.smg_password
 
         # Login process
-        await page.goto(base_url, wait_until="domcontentloaded", timeout=60000)
+        try:
+            await page.goto(base_url, wait_until="domcontentloaded", timeout=60000)
+        except Exception as e:
+            self.logger.warning(f"Initial navigation warning for {base_url}: {e}")
         await page.wait_for_timeout(3000)
         
         needs_login = await page.locator("a[href*='/login/']").count() > 0
@@ -187,7 +190,10 @@ class MediaPuller(commands.Cog):
         while current_url:
             self.logger.info(f"Scraping page: {current_url}")
             if page.url != current_url:
-                await page.goto(current_url, wait_until="domcontentloaded", timeout=60000)
+                try:
+                    await page.goto(current_url, wait_until="domcontentloaded", timeout=60000)
+                except Exception as e:
+                    self.logger.warning(f"Navigation warning for {current_url}: {e}")
                 await page.wait_for_timeout(3000)
                 
             content = await page.content()
@@ -258,7 +264,10 @@ class MediaPuller(commands.Cog):
                         pass
                         
                 page.on("response", handle_response)
-                await page.goto(ext_url, wait_until="networkidle", timeout=60000)
+                try:
+                    await page.goto(ext_url, wait_until="networkidle", timeout=60000)
+                except Exception as e:
+                    self.logger.warning(f"Navigation warning for external link {ext_url}: {e}")
                 await page.wait_for_timeout(6000) 
                 
                 page.remove_listener("response", handle_response)

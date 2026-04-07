@@ -97,6 +97,14 @@ class MediaPuller(commands.Cog):
                                 json.dump(list(history), f)
                             new_history.clear()
 
+                    if any("socialmediagirls.com" in m for m in media_urls):
+                        try:
+                            self.logger.info("Pre-visiting www.socialmediagirls.com to pass DDOS-guard JS challenge...")
+                            await page.goto("https://www.socialmediagirls.com/", wait_until="domcontentloaded", timeout=60000)
+                            await page.wait_for_timeout(5000)
+                        except Exception as e:
+                            self.logger.warning(f"Failed to pre-visit www subdomain (non-fatal): {e}")
+
                     for idx, img_url in enumerate(media_urls):
                         try:
                             resp = await context.request.get(img_url, headers={"Referer": url}, timeout=60000)
@@ -131,6 +139,8 @@ class MediaPuller(commands.Cog):
                                     files.append(discord.File(fp=io.BytesIO(data), filename=filename))
                                     current_batch_size += file_size
                                     new_history.append(img_url)
+                            else:
+                                self.logger.warning(f"Failed to download {img_url}, status code: {resp.status}")
                         except Exception as e:
                             self.logger.error(f"Failed to download media {img_url}: {e}")
                     

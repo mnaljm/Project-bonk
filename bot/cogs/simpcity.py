@@ -1,6 +1,7 @@
 import os
 import io
 import logging
+import asyncio
 import json
 import re
 from typing import List
@@ -197,7 +198,7 @@ class MediaPuller(commands.Cog):
                 await page.wait_for_timeout(3000)
                 
             content = await page.content()
-            soup = BeautifulSoup(content, "html.parser")
+            soup = await asyncio.to_thread(BeautifulSoup, content, "html.parser")
             
             login_required_text = "Login or Register to view"
             if login_required_text in content:
@@ -273,7 +274,7 @@ class MediaPuller(commands.Cog):
                 page.remove_listener("response", handle_response)
                 
                 ext_content = await page.content()
-                ext_soup = BeautifulSoup(ext_content, "html.parser")
+                ext_soup = await asyncio.to_thread(BeautifulSoup, ext_content, "html.parser")
                 
                 try:
                     dom_links = await page.evaluate('''() => Array.from(document.querySelectorAll('a')).map(a => a.href).filter(h => h.includes('srv-store'))''')

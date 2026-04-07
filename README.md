@@ -108,6 +108,10 @@ flake8 .
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
+
 ## Support
 
 For support, please open an issue on GitHub or contact the maintainers.

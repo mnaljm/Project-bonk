@@ -233,18 +233,11 @@ class Lockdown(commands.Cog):
     async def lockdown(
         self,
         interaction: discord.Interaction,
+        action: str,
         reason: str = None
     ):
         """Manage lockdown mode"""
-        if not is_superuser(interaction.user):
-            if not await Utils.check_permissions(interaction, ["manage_channels"]):
-                return
-        
-        # Check permissions
-        if is_superuser(interaction.user):
-            pass  # allow superuser bypass
-        #     # existing permission checks
-        elif not await Utils.check_permissions(interaction, ["administrator"]):
+        if not is_superuser(interaction.user) and not await Utils.check_permissions(interaction, ["administrator"]):
             return
         
         try:
@@ -395,15 +388,7 @@ class Lockdown(commands.Cog):
         value: str = None
     ):
         """Configure lockdown settings"""
-        if not is_superuser(interaction.user):
-            if not await Utils.check_permissions(interaction, ["manage_channels"]):
-                return
-        
-        # Check permissions
-        if is_superuser(interaction.user):
-            pass  # allow superuser bypass
-        #     # existing permission checks
-        elif not await Utils.check_permissions(interaction, ["administrator"]):
+        if not is_superuser(interaction.user) and not await Utils.check_permissions(interaction, ["administrator"]):
             return
         
         automod_settings = await self.bot.database.get_automod_settings(interaction.guild.id)

@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from typing import List
 
-from bot.utils.utils import Utils, is_superuser
+from bot.utils.utils import Utils
 
 
 class RoleAssignment(commands.Cog):
@@ -151,9 +151,6 @@ class RoleAssignment(commands.Cog):
     @app_commands.command(name="leave_role", description="Leave a Gooner role")
     @app_commands.describe(role="The Gooner role you want to leave")
     async def leave_role(self, interaction: discord.Interaction, role: str):
-        if not is_superuser(interaction.user):
-            if not await Utils.check_permissions(interaction, ["manage_roles"]):
-                return
         """Allow users to leave a Gooner role"""
         # Convert role ID string to role object
         try:
@@ -180,6 +177,15 @@ class RoleAssignment(commands.Cog):
             await Utils.send_response(
                 interaction,
                 embed=Utils.create_error_embed("You can only remove Gooner roles from yourself."),
+                ephemeral=True
+            )
+            return
+
+        # Check if role is manageable by bot
+        if role.managed or role >= interaction.guild.me.top_role:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_error_embed("This role cannot be managed by the bot."),
                 ephemeral=True
             )
             return
@@ -228,9 +234,6 @@ class RoleAssignment(commands.Cog):
     @app_commands.command(name="toggle_role", description="Toggle a Gooner role (join if you don't have it, leave if you do)")
     @app_commands.describe(role="The Gooner role you want to toggle")
     async def toggle_role(self, interaction: discord.Interaction, role: str):
-        if not is_superuser(interaction.user):
-            if not await Utils.check_permissions(interaction, ["manage_roles"]):
-                return
         """Toggle a Gooner role - join if not present, leave if present"""
         # Convert role ID string to role object
         try:
@@ -456,24 +459,53 @@ class RoleAssignment(commands.Cog):
             )
             return
 
+        # Filter out roles that the bot can't manage
+        removable_roles = []
+        unremovable_roles = []
+
+        for role in user_gooner_roles:
+            if role.managed or role >= interaction.guild.me.top_role:
+                unremovable_roles.append(role)
+            else:
+                removable_roles.append(role)
+
+        if not removable_roles:
+            await Utils.send_response(
+                interaction,
+                embed=Utils.create_error_embed(
+                    "None of your current Gooner roles can be removed by the bot.",
+                    "No Manageable Roles"
+                ),
+                ephemeral=True
+            )
+            return
+
         # Defer the response as removing multiple roles might take time
         await interaction.response.defer(ephemeral=True)
 
         try:
-            # Remove all Gooner roles from the user
-            await interaction.user.remove_roles(*user_gooner_roles, reason=f"Self-removed all Gooner roles")
+            # Remove all manageable Gooner roles from the user
+            await interaction.user.remove_roles(*removable_roles, reason=f"Self-removed all Gooner roles")
             
             embed = Utils.create_success_embed(
-                f"Successfully left {len(user_gooner_roles)} Gooner role(s)!",
+                f"Successfully left {len(removable_roles)} Gooner role(s)!",
                 "All Roles Removed"
             )
             
-            role_list = "\n".join([f"• {role.mention}" for role in user_gooner_roles])
+            role_list = "\n".join([f"• {role.mention}" for role in removable_roles])
             embed.add_field(
                 name="👋 Roles Removed",
                 value=role_list,
                 inline=False
             )
+
+            if unremovable_roles:
+                unremovable_list = "\n".join([f"• {role.mention}" for role in unremovable_roles])
+                embed.add_field(
+                    name="⚠️ Roles Not Removed",
+                    value=f"The following roles could not be removed:\n{unremovable_list}",
+                    inline=False
+                )
             
             embed.add_field(
                 name="🔒 Access Removed",
@@ -484,7 +516,7 @@ class RoleAssignment(commands.Cog):
             await Utils.send_response(interaction, embed=embed, ephemeral=True)
             
             # Log the action
-            role_names = [role.name for role in user_gooner_roles]
+            role_names = [role.name for role in removable_roles]
             self.bot.logger.info(f"User {interaction.user} self-removed all Gooner roles ({', '.join(role_names)}) in {interaction.guild.name}")
 
         except discord.Forbidden:

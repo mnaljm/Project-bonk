@@ -63,7 +63,9 @@ class MediaPuller(commands.Cog):
                             continue
                         if m.startswith("/"):
                             if "simpcity" in url_lower: m = "https://simpcity.cr" + m
-                            elif "socialmediagirls" in url_lower: m = "https://socialmediagirls.com" + m
+                            elif "socialmediagirls" in url_lower: m = "https://www.socialmediagirls.com" + m
+                        elif m.startswith("https://socialmediagirls.com/"):
+                            m = m.replace("https://socialmediagirls.com/", "https://www.socialmediagirls.com/")
                         normalized_urls.append(m)
                     
                     media_urls = [m for m in normalized_urls if m not in history]
@@ -97,7 +99,7 @@ class MediaPuller(commands.Cog):
 
                     for idx, img_url in enumerate(media_urls):
                         try:
-                            resp = await context.request.get(img_url, headers={"Referer": url})
+                            resp = await context.request.get(img_url, headers={"Referer": url}, timeout=60000)
                             if resp.status == 200:
                                 content_type = resp.headers.get("content-type", "")
                                 if "text/html" in content_type:
